@@ -1,0 +1,76 @@
+name: Autopilot
+
+on:
+  schedule:
+    - cron: "0 */3 * * *"
+  workflow_dispatch:
+    inputs:
+      force_format:
+        description: "short, long, or leave blank for automatic"
+        required: false
+        default: ""
+      report_only:
+        description: "true = only send the performance report"
+        required: false
+        default: "false"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: autopilot
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ffmpeg and fonts
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-dejavu-core
+
+      - name: Install Python packages
+        run: pip install -r requirements.txt
+
+      - name: Run autopilot
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+          FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
+          FB_PAGE_TOKEN: ${{ secrets.FB_PAGE_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          YOUTUBE_PRIVACY: ${{ vars.YOUTUBE_PRIVACY }}
+          YOUTUBE_DAILY_UPLOADS: ${{ vars.YOUTUBE_DAILY_UPLOADS }}
+          LONG_HOURS: ${{ vars.LONG_HOURS }}
+          TTS_VOICE: ${{ vars.TTS_VOICE }}
+          REPORT_HOUR_UTC: ${{ vars.REPORT_HOUR_UTC }}
+          FORCE_FORMAT: ${{ github.event.inputs.force_format }}
+          REPORT_ONLY: ${{ github.event.inputs.report_only }}
+        run: python autopilot.py
+
+      - name: Keep the video for 2 days
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: last-video
+          path: work/final_*.mp4
+          retention-days: 2
+          if-no-files-found: ignore
+
+      - name: Save history
+        if: always()
+        run: |
+          git config user.name "autopilot"
+          git config user.email "autopilot@users.noreply.github.com"
+          git add history.json
+          git diff --cached --quiet || (git commit -m "update history" && git pull --rebase && git push)
