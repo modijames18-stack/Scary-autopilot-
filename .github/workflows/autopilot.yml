@@ -58,7 +58,7 @@ jobs:
           REPORT_HOUR_UTC: ${{ vars.REPORT_HOUR_UTC }}
           FORCE_FORMAT: ${{ github.event.inputs.force_format }}
           REPORT_ONLY: ${{ github.event.inputs.report_only }}
-        run: python autopilot.py
+        run: python resilient_runner.py
 
       - name: Keep the video for 2 days
         if: always()
