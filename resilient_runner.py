@@ -132,10 +132,27 @@ def _local_research(fmt, hist):
     )
 
 
-# Replace only the unavailable network-dependent AI/research calls. Keep the
-# original audio, caption, FFmpeg rendering, history, and publishing pipeline.
-app.ask_ai = _local_ai
-app.research = _local_research
+# Prefer the configured AI provider. If it times out, is over quota, or is
+# unavailable, fall back to local original-story generation so a run can continue.
+_network_ai = app.ask_ai
+_network_research = app.research
+
+def _resilient_ai(system, prompt, max_tokens=4000, json_mode=False):
+    try:
+        return _network_ai(system, prompt, max_tokens=max_tokens, json_mode=json_mode)
+    except Exception as exc:
+        print("AI provider unavailable; using local story fallback:", str(exc)[:300])
+        return _local_ai(system, prompt, max_tokens=max_tokens, json_mode=json_mode)
+
+def _resilient_research(fmt, hist):
+    try:
+        return _network_research(fmt, hist)
+    except Exception as exc:
+        print("Research unavailable; using local guidance:", str(exc)[:300])
+        return _local_research(fmt, hist)
+
+app.ask_ai = _resilient_ai
+app.research = _resilient_research
 
 if __name__ == "__main__":
     app.main()
