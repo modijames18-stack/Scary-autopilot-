@@ -38,6 +38,9 @@ jobs:
       - name: Install Python packages
         run: pip install -r requirements.txt
 
+      - name: Check Python syntax
+        run: python -m py_compile autopilot.py resilient_runner.py
+
       - name: Run autopilot
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
