@@ -97,7 +97,7 @@ def ask_ai(system, prompt, max_tokens=4000, json_mode=False):
         )
         return "".join(b.text for b in msg.content if b.type == "text")
 
-    model = env("GEMINI_MODEL", "gemini-2.5-flash")
+    model = env("GEMINI_MODEL", "gemini-3.8-flash")
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
     gen = {"maxOutputTokens": max(max_tokens, 2000) + 2000, "temperature": 1.0}
     if json_mode:
