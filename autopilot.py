@@ -1,6 +1,6 @@
 """
-Scary-story autopilot.
-Every run: research top videos -> write ORIGINAL script -> AI voice -> build video
+Future-risk documentary autopilot.
+Every run: research current future-risk topics -> write an evidence-aware scenario -> AI voice -> build video
 -> post to YouTube + Facebook Page -> Telegram alerts (+ daily performance report).
 
 Runs on GitHub Actions every 3 hours. Mix of short and long videos.
@@ -150,8 +150,7 @@ def yt_credentials():
 
 # ---------------------------------------------------------------- 1. research
 def research(fmt, hist):
-    """Look at top scary-story videos from the last 30 days and summarise the pattern.
-    Cached once per day per format to save YouTube API quota."""
+    """Research current public-interest future risks, cached once per day and format."""
     cached = hist["patterns"].get(fmt)
     if cached and cached.get("date") == TODAY:
         return cached["notes"]
@@ -160,25 +159,26 @@ def research(fmt, hist):
     yt = build("youtube", "v3", credentials=yt_credentials(), cache_discovery=False)
     since = (NOW - dt.timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
     res = yt.search().list(
-        q="scary story horror", part="id", type="video", order="viewCount",
+        q="AI jobs climate change water scarcity internet outage future technology risks",
+        part="id", type="video", order="viewCount",
         videoDuration="short" if fmt == "short" else "medium",
         publishedAfter=since, maxResults=15, relevanceLanguage="en",
     ).execute()
     ids = [i["id"]["videoId"] for i in res.get("items", [])]
     if not ids:
-        return "(no research data today)"
+        return "Research unavailable; rely on well-established evidence and clearly label uncertainty."
     vids = yt.videos().list(part="snippet,statistics,contentDetails", id=",".join(ids)).execute()["items"]
     rows = [
-        f"- \"{v['snippet']['title']}\" | {v['statistics'].get('viewCount', '?')} views | length {v['contentDetails']['duration']}"
+        f"- \"{v['snippet']['title']}\" | {v['statistics'].get('viewCount', '?')} views"
         for v in vids
     ]
     notes = ask_ai(
-        "You analyse viral video patterns for a storytelling channel.",
-        "Here are top-performing scary-story videos from the last 30 days:\n"
-        + "\n".join(rows)
-        + "\n\nIn under 180 words, describe the PATTERNS only: hook styles, title formulas, "
-          "themes and settings, pacing, typical length. Do not copy any specific story.",
-        max_tokens=600,
+        "You are a research assistant for a science and future-risk documentary channel.",
+        "Review these popular videos only for audience-interest patterns, not as evidence. "
+        "Suggest useful questions to investigate about AI and jobs, energy, water, climate, "
+        "internet infrastructure, governance and other future risks. Do not repeat claims "
+        "unless they can be verified with reliable evidence.\n" + "\n".join(rows),
+        max_tokens=700,
     )
     hist["patterns"][fmt] = {"date": TODAY, "notes": notes}
     return notes
@@ -188,45 +188,65 @@ def research(fmt, hist):
 def write_script(fmt, patterns, hist):
     recent = [p["title"] for p in hist["posts"][-40:]]
     if fmt == "short":
-        spec = ("A SHORT vertical video. Narration 120-150 words (about 50 seconds). "
-                "First sentence must be a gripping hook. End on a chilling twist or cliffhanger.")
+        spec = ("A SHORT vertical explainer, 120-150 spoken words, about 50 seconds. "
+                "Open with a gripping question or plausible scenario. Explain one real risk "
+                "and end with one practical solution plus a question for viewers.")
     else:
-        spec = ("A LONG video. Narration 1200-1500 words (about 8-9 minutes). "
-                "Strong hook in the first 2 sentences, slow-building dread, a clear 3-act structure, "
-                "and a memorable ending.")
-    prompt = f"""Write a completely ORIGINAL scary story for a faceless narration channel.
+        spec = ("A LONG documentary, 900-1200 spoken words, about 6-8 minutes. "
+                "Use a strong hook, clear sections, real-world evidence, competing viewpoints, "
+                "uncertainties, impacts on ordinary people, practical solutions, and a thoughtful ending.")
+    prompt = f"""Create an ORIGINAL, realistic, thought-provoking future-risk documentary for a faceless channel.
 {spec}
 
-What is working right now (patterns only, do not copy):
+Choose one topic per video, rotating among: AI replacing or changing jobs; concentration of power
+and the hypothetical idea of one-world government; a worldwide internet or power outage; water
+scarcity, drying rivers and drought; rivers turning red due to algae, pollution or other natural
+causes; climate change and extreme weather; threats to food, health, energy and ecosystems; and
+future technologies humanity may struggle to govern.
+
+Research notes and audience-interest patterns (not proof):
 {patterns}
 
-Titles already used (do NOT repeat these themes or titles):
+Titles already used (avoid repeating them):
 {recent}
 
-Rules: original plot and characters, no real people, no gore for shock value, no
-stage directions, plain spoken English that an AI voice can read smoothly.
+Editorial rules:
+- Separate established facts, credible forecasts, and hypothetical thought experiments.
+- Never present an imagined catastrophe as a prediction or say it is happening without evidence.
+- Explain causes, likelihood or uncertainty, who could be affected, and what people or communities can do.
+- For claims about current events, science, statistics or forecasts, use cautious wording and name
+  the type of reliable source viewers should consult; never invent studies, experts, statistics or quotes.
+- For "one-world government", discuss governance, sovereignty, accountability and hypothetical risks
+  without claiming a secret plan exists.
+- For red rivers, explain real causes such as mineral runoff, algae or pollution; do not claim water
+  has literally become blood.
+- Use calm, serious, cinematic narration, plain spoken English, no gore, no fabricated eyewitnesses,
+  and no fearmongering. Invite debate and constructive solutions.
+- Visual search phrases must match the subject (data centres, workers, drought, rivers, power grids,
+  satellites, farms, laboratories), not generic haunted-house footage.
 
 Reply with ONLY a JSON object with these keys:
 "title": under 85 characters, curiosity-driven, no hashtags,
-"description": 2-3 sentences, no hashtags,
+"description": 2-3 accurate sentences that identify whether the scenario is hypothetical,
 "tags": list of up to 10 short tags,
 "narration": the full spoken text as one string,
-"visual_keywords": list of 8 stock-footage search phrases (dark, moody, atmospheric, e.g. "foggy forest night", "abandoned hallway", "rain window"). Avoid close-ups of people."""
+"visual_keywords": list of 8 relevant stock-footage search phrases."""
     raw = ask_ai(
-        "You are a gifted horror storyteller and an expert in viral short-form video.",
-        prompt, max_tokens=900 if fmt == "short" else 5000, json_mode=True,
+        "You are an investigative science communicator and future-risk documentary writer. "
+        "Be compelling, evidence-aware, balanced, and solution-focused.",
+        prompt, max_tokens=1200 if fmt == "short" else 5000, json_mode=True,
     )
     meta = parse_meta(raw)
 
-    if fmt == "short":  # polish pass: sharpen the hook and the ending
+    if fmt == "short":
         try:
             better = ask_ai(
-                "You are a ruthless editor of viral horror shorts.",
-                "Improve this short horror script. Make the FIRST sentence a stronger hook and the "
-                "LAST sentence a more chilling twist. Keep it original, 120-150 words, plain spoken "
-                "English. Reply with ONLY the same JSON object (same keys).\n\n"
-                + json.dumps(meta),
-                max_tokens=900, json_mode=True,
+                "You are a careful editor of short science and future-risk explainers.",
+                "Improve this short documentary script. Strengthen the opening hook and end with "
+                "a useful solution and question. Keep it factual, balanced, 120-150 words, plain "
+                "spoken English. Clearly label hypothetical events. Reply with ONLY the same JSON "
+                "object (same keys).\n\n" + json.dumps(meta),
+                max_tokens=1200, json_mode=True,
             )
             meta = parse_meta(better)
         except Exception as e:
@@ -386,7 +406,7 @@ def build_video(fmt, meta, duration):
 
 # ---------------------------------------------------------------- 5. publish
 def hashtags(meta, fmt):
-    tags = ["#scarystories", "#horror", "#creepy"] + (["#shorts"] if fmt == "short" else [])
+    tags = ["#future", "#technology", "#science", "#solutions"] + (["#shorts"] if fmt == "short" else [])
     return " ".join(tags)
 
 
@@ -398,7 +418,7 @@ def post_youtube(video, meta, fmt):
     body = {
         "snippet": {
             "title": title,
-            "description": f"{meta['description']}\n\n{hashtags(meta, fmt)}\n\nAI-narrated original story.",
+            "description": f"{meta['description']}\n\n{hashtags(meta, fmt)}\n\nAI-narrated future-risk explainer.",
             "tags": [str(t)[:30] for t in meta["tags"]][:10],
             "categoryId": "24",
         },
