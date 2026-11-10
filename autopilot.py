@@ -264,7 +264,41 @@ Reply with ONLY a JSON object with these keys:
             meta = verify_source_links(parse_meta(better))
         except Exception as e:
             print("Polish pass skipped:", e)
+    meta["visual_scenes"] = make_visual_plan(meta["narration"])
     return meta
+
+
+def make_visual_plan(narration):
+    """Create ordered, narration-specific footage searches; never use one global keyword pool."""
+    sentences = re.split(r"(?<=[.!?])\\s+", narration.strip())
+    chunks = [" ".join(sentences[i:i + 3]).strip() for i in range(0, len(sentences), 3)]
+    chunks = [chunk for chunk in chunks if chunk]
+    if not chunks:
+        raise ValueError("Narration is empty; cannot plan documentary scenes.")
+    numbered = "\\n".join(f"{i + 1}. {chunk}" for i, chunk in enumerate(chunks))
+    raw = ask_ai(
+        "You are a documentary footage researcher. Match visuals precisely to narration. "
+        "Never imply that illustrative footage documents an event it does not show.",
+        "For each numbered narration segment, return 2-4 concise, concrete search phrases "
+        "for authentic stock documentary footage. Keep the same order and number of scenes. "
+        "Avoid generic phrases and avoid repeating the same phrase. If a claim is hypothetical, "
+        "choose clearly illustrative visuals rather than fake news footage. Return ONLY JSON: "
+        '{"scenes":[{"index":1,"keywords":["...","..."]}]}\\n\\n' + numbered,
+        max_tokens=1800, json_mode=True,
+    )
+    data = json.loads(raw[raw.find("{"):raw.rfind("}") + 1])
+    scenes = data.get("scenes", [])
+    if len(scenes) != len(chunks):
+        raise ValueError("AI footage plan did not return one scene for every narration segment.")
+    plan = []
+    for expected, item in enumerate(scenes, 1):
+        if item.get("index") != expected or not isinstance(item.get("keywords"), list):
+            raise ValueError("AI footage plan has missing or out-of-order scene indexes.")
+        keywords = [str(k).strip() for k in item["keywords"] if str(k).strip()][:4]
+        if len(keywords) < 2:
+            raise ValueError(f"Scene {expected} has too few specific footage searches.")
+        plan.append({"text": chunks[expected - 1], "keywords": keywords})
+    return plan
 
 
 def parse_meta(raw):
@@ -437,21 +471,35 @@ def fetch_clips(keywords, fmt, need, W, H):
 
 def build_video(fmt, meta, duration):
     W, H = (720, 1280) if fmt == "short" else (1280, 720)
-    clips = fetch_clips(meta["visual_keywords"], fmt, duration, W, H)
-    if len(clips) < 3:
-        raise RuntimeError(
-            f"Only {len(clips)} relevant footage clips were found. Refusing to publish a documentary "
-            "with a blank or misleading visual track. Add a valid PEXELS_API_KEY or PIXABAY_API_KEY "
-            "and try again."
-        )
-    entries, total, i = [], 0.0, 0
-    while total < duration + 1:
-        name, d = clips[i % len(clips)]
-        entries.append(f"file '{name}'")
-        total += d
-        i += 1
-    (WORK / "list.txt").write_text("\n".join(entries))
-    run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", "list.txt", "-c", "copy", "visual.mp4"])
+    scenes = meta.get("visual_scenes") or []
+    if not scenes:
+        raise RuntimeError("No narration-matched visual scene plan; refusing generic filler footage.")
+    word_counts = [max(1, len(scene["text"].split())) for scene in scenes]
+    total_words = sum(word_counts)
+    visual_entries = []
+    for scene_no, (scene, count) in enumerate(zip(scenes, word_counts), 1):
+        scene_duration = duration * count / total_words
+        clips = fetch_clips(scene["keywords"], fmt, scene_duration, W, H)
+        if not clips:
+            raise RuntimeError(
+                f"No matching footage found for narration scene {scene_no}: "
+                f"{scene['keywords']}. Refusing unrelated filler footage."
+            )
+        scene_entries, covered, i = [], 0.0, 0
+        while covered < scene_duration + 0.2:
+            name, clip_duration = clips[i % len(clips)]
+            scene_entries.append(f"file '{name}'")
+            covered += clip_duration
+            i += 1
+        scene_list = WORK / f"scene_{scene_no:02}.txt"
+        scene_list.write_text("\\n".join(scene_entries), encoding="utf-8")
+        scene_video = f"scene_{scene_no:02}.mp4"
+        run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", scene_list.name,
+             "-t", f"{scene_duration:.2f}", "-c", "copy", scene_video])
+        visual_entries.append(f"file '{scene_video}'")
+    (WORK / "list.txt").write_text("\\n".join(visual_entries), encoding="utf-8")
+    run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", "list.txt",
+         "-t", f"{duration + 0.5:.2f}", "-c", "copy", "visual.mp4"])
     style = ("FontName=DejaVu Sans,Bold=1,FontSize=11,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,"
              "BorderStyle=1,Outline=2,Alignment=2,MarginV=90") if fmt == "short" else \
             ("FontName=DejaVu Sans,Bold=1,FontSize=15,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,"
