@@ -277,6 +277,8 @@ def parse_meta(raw):
     meta.setdefault("sources", [])
     if not isinstance(meta["sources"], list):
         raise ValueError("Script sources must be a list")
+    if not isinstance(meta["visual_keywords"], list) or len(meta["visual_keywords"]) < 4:
+        raise ValueError("Script must include at least four documentary footage search phrases")
     return meta
 
 
@@ -294,9 +296,10 @@ def verify_source_links(meta):
             continue
         url = str(source.get("url", "")).strip()
         title = str(source.get("title", "")).strip()
+        supports = str(source.get("supports", "")).strip()
         host = (urlparse(url).hostname or "").lower()
         trusted = any(host == suffix.lstrip(".") or host.endswith(suffix) for suffix in trusted_suffixes)
-        if not title or not url.startswith("https://") or not trusted:
+        if not title or not supports or not url.startswith("https://") or not trusted:
             continue
         try:
             response = requests.get(url, timeout=20, headers={"User-Agent": "ScaryAutopilotResearch/1.0"})
@@ -389,8 +392,8 @@ def find_candidates(keywords, fmt, W):
                     found.append((f"pe{v['id']}", f["link"], float(v.get("duration", 7))))
         except Exception as e:
             print("Footage search failed:", kw, e)
-        random.shuffle(found)
-        per_kw.append(found[:4])
+        # Keep provider relevance order; random shuffling can select unrelated footage.
+        per_kw.append(found[:8])
     return [lst[i] for i in range(4) for lst in per_kw if i < len(lst)]
 
 
@@ -427,18 +430,20 @@ def fetch_clips(keywords, fmt, need, W, H):
 def build_video(fmt, meta, duration):
     W, H = (720, 1280) if fmt == "short" else (1280, 720)
     clips = fetch_clips(meta["visual_keywords"], fmt, duration, W, H)
-    if clips:
-        entries, total, i = [], 0.0, 0
-        while total < duration + 1:
-            name, d = clips[i % len(clips)]
-            entries.append(f"file '{name}'")
-            total += d
-            i += 1
-        (WORK / "list.txt").write_text("\n".join(entries))
-        run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", "list.txt", "-c", "copy", "visual.mp4"])
-    else:  # fallback: plain dark background
-        run(["ffmpeg", "-y", "-f", "lavfi", "-i", f"color=c=0x0a0a12:s={W}x{H}:d={duration + 1}:r=30",
-             "-c:v", "libx264", "-pix_fmt", "yuv420p", "visual.mp4"])
+    if len(clips) < 3:
+        raise RuntimeError(
+            f"Only {len(clips)} relevant footage clips were found. Refusing to publish a documentary "
+            "with a blank or misleading visual track. Add a valid PEXELS_API_KEY or PIXABAY_API_KEY "
+            "and try again."
+        )
+    entries, total, i = [], 0.0, 0
+    while total < duration + 1:
+        name, d = clips[i % len(clips)]
+        entries.append(f"file '{name}'")
+        total += d
+        i += 1
+    (WORK / "list.txt").write_text("\n".join(entries))
+    run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", "list.txt", "-c", "copy", "visual.mp4"])
     style = ("FontName=DejaVu Sans,Bold=1,FontSize=11,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,"
              "BorderStyle=1,Outline=2,Alignment=2,MarginV=90") if fmt == "short" else \
             ("FontName=DejaVu Sans,Bold=1,FontSize=15,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,"
