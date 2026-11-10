@@ -15,6 +15,7 @@ import subprocess
 import time
 import traceback
 from pathlib import Path
+from urllib.parse import urlparse
 
 import requests
 import anthropic
@@ -247,7 +248,7 @@ Reply with ONLY a JSON object with these keys:
         "Be compelling, evidence-aware, balanced, and solution-focused.",
         prompt, max_tokens=1200 if fmt == "short" else 5000, json_mode=True,
     )
-    meta = parse_meta(raw)
+    meta = verify_source_links(parse_meta(raw))
 
     if fmt == "short":
         try:
@@ -260,7 +261,7 @@ Reply with ONLY a JSON object with these keys:
                 "Reply with ONLY the same JSON object (same keys).\n\n" + json.dumps(meta),
                 max_tokens=1200, json_mode=True,
             )
-            meta = parse_meta(better)
+            meta = verify_source_links(parse_meta(better))
         except Exception as e:
             print("Polish pass skipped:", e)
     return meta
@@ -276,6 +277,37 @@ def parse_meta(raw):
     meta.setdefault("sources", [])
     if not isinstance(meta["sources"], list):
         raise ValueError("Script sources must be a list")
+    return meta
+
+
+def verify_source_links(meta):
+    """Keep only reachable sources on recognized research or public-institution domains."""
+    trusted_suffixes = (
+        ".gov", ".gov.uk", ".gov.au", ".gov.et", ".edu", ".int", ".un.org",
+        ".worldbank.org", ".ilo.org", ".oecd.org", ".who.int", ".ipcc.ch",
+        ".iea.org", ".imf.org", ".nasa.gov", ".noaa.gov", ".nature.com",
+        ".science.org", ".pnas.org", ".nationalacademies.org", ".ec.europa.eu",
+    )
+    verified = []
+    for source in meta.get("sources", []):
+        if not isinstance(source, dict):
+            continue
+        url = str(source.get("url", "")).strip()
+        title = str(source.get("title", "")).strip()
+        host = (urlparse(url).hostname or "").lower()
+        trusted = any(host == suffix.lstrip(".") or host.endswith(suffix) for suffix in trusted_suffixes)
+        if not title or not url.startswith("https://") or not trusted:
+            continue
+        try:
+            response = requests.get(url, timeout=20, headers={"User-Agent": "ScaryAutopilotResearch/1.0"})
+            if response.ok and response.url.startswith("https://"):
+                verified.append(source)
+        except requests.RequestException as exc:
+            print("Source link check failed:", url, str(exc)[:160])
+    meta["sources"] = verified
+    if len(verified) < 2:
+        raise ValueError("Fewer than two reachable sources from recognized research or public-institution domains; refusing to produce an unsourced documentary.")
+    print(f"Source link check passed: {len(verified)} reachable authoritative links")
     return meta
 
 
