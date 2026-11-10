@@ -591,7 +591,7 @@ def main():
             patterns = research(fmt, hist)
         except Exception as e:
             print("Research failed:", e)
-            patterns = "(research unavailable; use general viral horror storytelling best practice)"
+            patterns = "(audience research unavailable; use established evidence, primary sources, balanced uncertainty, and an investigative documentary structure; do not invent events or claims)"
         meta = write_script(fmt, patterns, hist)
         duration = make_voice_and_captions(fmt, meta["narration"])
         video = build_video(fmt, meta, duration)
