@@ -210,27 +210,38 @@ Research notes and audience-interest patterns (not proof):
 Titles already used (avoid repeating them):
 {recent}
 
-Editorial rules:
-- Separate established facts, credible forecasts, and hypothetical thought experiments.
-- Never present an imagined catastrophe as a prediction or say it is happening without evidence.
-- Explain causes, likelihood or uncertainty, who could be affected, and what people or communities can do.
-- For claims about current events, science, statistics or forecasts, use cautious wording and name
-  the type of reliable source viewers should consult; never invent studies, experts, statistics or quotes.
-- For "one-world government", discuss governance, sovereignty, accountability and hypothetical risks
-  without claiming a secret plan exists.
-- For red rivers, explain real causes such as mineral runoff, algae or pollution; do not claim water
-  has literally become blood.
-- Use calm, serious, cinematic narration, plain spoken English, no gore, no fabricated eyewitnesses,
-  and no fearmongering. Invite debate and constructive solutions.
-- Visual search phrases must match the subject (data centres, workers, drought, rivers, power grids,
-  satellites, farms, laboratories), not generic haunted-house footage.
+Investigative documentary rules (mandatory):
+- Make this feel like a high-quality investigative documentary, NEVER a fictional horror story.
+- Open with a striking question or documented real-world development, not an invented character,
+  fake emergency broadcast, fictional town, or fabricated eyewitness.
+- Build a clear investigation: what is happening now; what reliable evidence shows; what experts
+  disagree about; what could plausibly happen next; who would be affected; and what solutions exist.
+- Label statements clearly in the narration as FACT, FORECAST, or WHAT-IF when the distinction matters.
+  A hypothetical scenario must be explicitly described as hypothetical.
+- Use specific, checkable evidence. Never invent statistics, studies, report titles, quotations,
+  experts, dates, or source URLs. If a precise claim cannot be supported, omit it or qualify it.
+- Include 2-5 real source entries in the JSON. Prefer primary and authoritative sources such as
+  peer-reviewed research, government science agencies, UN bodies, the ILO, World Bank, WHO, IPCC,
+  IEA, and official infrastructure or company reports. Each source must have a real title and exact
+  public URL that directly supports a claim in the script. Do not use other YouTube videos as evidence.
+- Explain uncertainty, limitations, and competing viewpoints fairly. Avoid claiming that a forecast
+  is certain or that a worst-case scenario is inevitable.
+- Use serious, confident, human narration; cinematic pacing, meaningful pauses, and suspense created
+  by evidence and unanswered questions—not fake scares, gore, or exaggerated claims.
+- End with practical responses and one thoughtful question that invites discussion.
+- Visual search phrases must describe authentic documentary footage relevant to each section:
+  real workplaces, workers, data centres, power grids, reservoirs, rivers, farms, laboratories,
+  scientific fieldwork, public infrastructure, and affected communities. Never request haunted-house
+  imagery or visuals that falsely imply a hypothetical event is real.
+- Research notes above indicate audience interest only; they are NOT factual evidence.
 
 Reply with ONLY a JSON object with these keys:
-"title": under 85 characters, curiosity-driven, no hashtags,
-"description": 2-3 accurate sentences that identify whether the scenario is hypothetical,
+"title": under 85 characters, specific and curiosity-driven, no hashtags,
+"description": 2-3 accurate sentences; disclose clearly if discussing a hypothetical scenario,
 "tags": list of up to 10 short tags,
 "narration": the full spoken text as one string,
-"visual_keywords": list of 8 relevant stock-footage search phrases."""
+"visual_keywords": list of 8-12 relevant documentary-footage search phrases,
+"sources": list of 2-5 objects, each with "title", "url", and "supports" (the claim it supports)."""
     raw = ask_ai(
         "You are an investigative science communicator and future-risk documentary writer. "
         "Be compelling, evidence-aware, balanced, and solution-focused.",
@@ -242,10 +253,11 @@ Reply with ONLY a JSON object with these keys:
         try:
             better = ask_ai(
                 "You are a careful editor of short science and future-risk explainers.",
-                "Improve this short documentary script. Strengthen the opening hook and end with "
-                "a useful solution and question. Keep it factual, balanced, 120-150 words, plain "
-                "spoken English. Clearly label hypothetical events. Reply with ONLY the same JSON "
-                "object (same keys).\n\n" + json.dumps(meta),
+                "Improve this short investigative documentary script. Keep it evidence-led, never "
+                "turn it into fictional horror. Preserve real source entries and all supported facts; "
+                "do not add unsupported claims or invent sources. Strengthen the hook, keep it balanced, "
+                "120-150 words, and end with a practical response and question. Clearly label hypotheticals. "
+                "Reply with ONLY the same JSON object (same keys).\n\n" + json.dumps(meta),
                 max_tokens=1200, json_mode=True,
             )
             meta = parse_meta(better)
@@ -261,6 +273,9 @@ def parse_meta(raw):
         if k not in meta:
             raise ValueError(f"Script missing '{k}'")
     meta.setdefault("tags", [])
+    meta.setdefault("sources", [])
+    if not isinstance(meta["sources"], list):
+        raise ValueError("Script sources must be a list")
     return meta
 
 
@@ -418,7 +433,7 @@ def post_youtube(video, meta, fmt):
     body = {
         "snippet": {
             "title": title,
-            "description": f"{meta['description']}\n\n{hashtags(meta, fmt)}\n\nAI-narrated future-risk explainer.",
+            "description": f"{meta['description']}\n\n{hashtags(meta, fmt)}\n\nSources:\n" + "\n".join(f"- {s.get('title', 'Source')}: {s.get('url', '')}" for s in meta.get('sources', []) if s.get('url')) + "\n\nAI-narrated investigative documentary.",
             "tags": [str(t)[:30] for t in meta["tags"]][:10],
             "categoryId": "24",
         },
@@ -445,7 +460,8 @@ def _fb_check(r):
 def post_facebook(video, meta, fmt):
     page, token = env("FB_PAGE_ID"), env("FB_PAGE_TOKEN")
     g = "https://graph.facebook.com/v21.0"
-    desc = f"{meta['title']}\n\n{meta['description']}\n\n{hashtags(meta, fmt)}"
+    source_lines = "\n".join(f"- {s.get('title', 'Source')}: {s.get('url', '')}" for s in meta.get('sources', []) if s.get('url'))
+    desc = f"{meta['title']}\n\n{meta['description']}\n\n{hashtags(meta, fmt)}" + (f"\n\nSources:\n{source_lines}" if source_lines else "")
     if fmt == "short":  # Reel
         j = _fb_check(requests.post(f"{g}/{page}/video_reels",
                                     data={"upload_phase": "start", "access_token": token}, timeout=60))
