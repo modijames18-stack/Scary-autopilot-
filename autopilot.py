@@ -270,12 +270,12 @@ Reply with ONLY a JSON object with these keys:
 
 def make_visual_plan(narration):
     """Create ordered, narration-specific footage searches; never use one global keyword pool."""
-    sentences = re.split(r"(?<=[.!?])\\s+", narration.strip())
+    sentences = re.split(r"(?<=[.!?])\s+", narration.strip())
     chunks = [" ".join(sentences[i:i + 3]).strip() for i in range(0, len(sentences), 3)]
     chunks = [chunk for chunk in chunks if chunk]
     if not chunks:
         raise ValueError("Narration is empty; cannot plan documentary scenes.")
-    numbered = "\\n".join(f"{i + 1}. {chunk}" for i, chunk in enumerate(chunks))
+    numbered = "\n".join(f"{i + 1}. {chunk}" for i, chunk in enumerate(chunks))
     raw = ask_ai(
         "You are a documentary footage researcher. Match visuals precisely to narration. "
         "Never imply that illustrative footage documents an event it does not show.",
@@ -283,7 +283,7 @@ def make_visual_plan(narration):
         "for authentic stock documentary footage. Keep the same order and number of scenes. "
         "Avoid generic phrases and avoid repeating the same phrase. If a claim is hypothetical, "
         "choose clearly illustrative visuals rather than fake news footage. Return ONLY JSON: "
-        '{"scenes":[{"index":1,"keywords":["...","..."]}]}\\n\\n' + numbered,
+        '{"scenes":[{"index":1,"keywords":["...","..."]}]}\n\n' + numbered,
         max_tokens=1800, json_mode=True,
     )
     data = json.loads(raw[raw.find("{"):raw.rfind("}") + 1])
@@ -492,12 +492,12 @@ def build_video(fmt, meta, duration):
             covered += clip_duration
             i += 1
         scene_list = WORK / f"scene_{scene_no:02}.txt"
-        scene_list.write_text("\\n".join(scene_entries), encoding="utf-8")
+        scene_list.write_text("\n".join(scene_entries), encoding="utf-8")
         scene_video = f"scene_{scene_no:02}.mp4"
         run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", scene_list.name,
              "-t", f"{scene_duration:.2f}", "-c", "copy", scene_video])
         visual_entries.append(f"file '{scene_video}'")
-    (WORK / "list.txt").write_text("\\n".join(visual_entries), encoding="utf-8")
+    (WORK / "list.txt").write_text("\n".join(visual_entries), encoding="utf-8")
     run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", "list.txt",
          "-t", f"{duration + 0.5:.2f}", "-c", "copy", "visual.mp4"])
     style = ("FontName=DejaVu Sans,Bold=1,FontSize=11,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,"
