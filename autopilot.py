@@ -31,6 +31,11 @@ def env(name, default=""):
     return v or default
 
 
+def publishing_enabled(variable):
+    """Publishing is opt-in; missing or non-true switches always disable uploads."""
+    return env(variable).lower() == "true"
+
+
 MODEL = env("CLAUDE_MODEL", "claude-sonnet-5-5")
 LONG_HOURS = [int(h) for h in env("LONG_HOURS", "6,18").split(",") if h.strip()]
 YT_PRIVACY = env("YOUTUBE_PRIVACY", "private")  # switch to "public" once Google approves your app
@@ -665,21 +670,25 @@ def main():
     msgs = []
 
     yt_today = sum(1 for p in hist["posts"] if p.get("youtube_id") and p["time"][:10] == TODAY)
-    if env("YT_REFRESH_TOKEN") and yt_today < YT_DAILY_CAP:
+    if publishing_enabled("ENABLE_YOUTUBE_UPLOAD") and env("YT_REFRESH_TOKEN") and yt_today < YT_DAILY_CAP:
         try:
             record["youtube_id"] = post_youtube(video, meta, fmt)
             msgs.append(f"▶️ YouTube ({YT_PRIVACY}): https://youtu.be/{record['youtube_id']}")
         except Exception as e:
             notify(f"❌ YouTube upload failed: {str(e)[:700]}")
+    elif not publishing_enabled("ENABLE_YOUTUBE_UPLOAD"):
+        msgs.append("▶️ YouTube skipped: upload approval switch is off")
     elif env("YT_REFRESH_TOKEN"):
         msgs.append("▶️ YouTube skipped: daily upload cap reached")
 
-    if env("FB_PAGE_TOKEN") and env("FB_PAGE_ID"):
+    if publishing_enabled("ENABLE_FACEBOOK_PUBLISH") and env("FB_PAGE_TOKEN") and env("FB_PAGE_ID"):
         try:
             record["facebook_id"] = post_facebook(video, meta, fmt)
             msgs.append(f"📘 Facebook: posted ({record['facebook_id']})")
         except Exception as e:
             notify(f"❌ Facebook post failed: {str(e)[:700]}")
+    elif not publishing_enabled("ENABLE_FACEBOOK_PUBLISH"):
+        msgs.append("📘 Facebook skipped: publishing approval switch is off")
 
     hist["posts"].append(record)
     save_history(hist)
