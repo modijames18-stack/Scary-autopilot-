@@ -11,6 +11,14 @@ This document describes what is implemented and what is required before enabling
 | Instagram | Not implemented | Professional Instagram account linked to a Facebook Page, Meta app permissions, Instagram account ID, and public HTTPS video hosting |
 | TikTok | Not implemented; previous code only skipped it | A compliant TikTok developer app and approved scopes; see restrictions below |
 
+## Publishing safety switches
+
+The scheduled workflow runs every three hours, but social publishing is disabled unless the repository owner explicitly enables it. Add these GitHub Actions **Variables** only after reviewing a generated video and deciding to allow that platform to publish:
+- `ENABLE_YOUTUBE_UPLOAD=true` to allow YouTube uploads (the default remains disabled).
+- `ENABLE_FACEBOOK_PUBLISH=true` to allow Facebook Page publishing (the default remains disabled).
+
+If either variable is missing, blank, or anything other than `true`, that platform is skipped. Credentials alone never authorize a post. YouTube visibility still defaults to `private`; changing it to `public` is a separate owner decision.
+
 ## YouTube
 
 Configure these GitHub Actions secrets:
