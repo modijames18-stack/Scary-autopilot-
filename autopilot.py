@@ -367,21 +367,29 @@ def find_candidates(keywords, fmt, W):
     pix, pex = env("PIXABAY_API_KEY"), env("PEXELS_API_KEY")
     for kw in keywords[:8]:
         found = []
-        try:
-            if pix:
+        # Try Pixabay first when configured, then fall back to Pexels if it
+        # errors or returns no usable clips. One provider's empty result should
+        # not prevent the other free provider from being used.
+        if pix:
+            try:
                 r = requests.get("https://pixabay.com/api/videos/",
                                  params={"key": pix, "q": kw[:90], "per_page": 12, "safesearch": "true"},
                                  timeout=30)
+                r.raise_for_status()
                 for h in r.json().get("hits", []):
                     vs = h.get("videos", {})
                     pick = vs.get("large") if vs.get("large", {}).get("url") else vs.get("medium")
                     if pick and pick.get("url"):
                         found.append((f"px{h['id']}", pick["url"], float(h.get("duration", 7))))
-            elif pex:
+            except Exception as e:
+                print("Pixabay footage search failed:", kw, e)
+        if not found and pex:
+            try:
                 orient = "portrait" if fmt == "short" else "landscape"
                 r = requests.get("https://api.pexels.com/videos/search",
                                  headers={"Authorization": pex},
                                  params={"query": kw, "orientation": orient, "per_page": 8}, timeout=30)
+                r.raise_for_status()
                 for v in r.json().get("videos", []):
                     files = [f for f in v.get("video_files", [])
                              if f.get("file_type") == "video/mp4" and f.get("width")]
@@ -390,8 +398,8 @@ def find_candidates(keywords, fmt, W):
                     ok = [f for f in files if f["width"] >= W]
                     f = min(ok, key=lambda x: x["width"]) if ok else max(files, key=lambda x: x["width"])
                     found.append((f"pe{v['id']}", f["link"], float(v.get("duration", 7))))
-        except Exception as e:
-            print("Footage search failed:", kw, e)
+            except Exception as e:
+                print("Pexels footage search failed:", kw, e)
         # Keep provider relevance order; random shuffling can select unrelated footage.
         per_kw.append(found[:8])
     return [lst[i] for i in range(4) for lst in per_kw if i < len(lst)]
