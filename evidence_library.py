@@ -19,7 +19,7 @@ TOPICS = {
             },
             {
                 "title": "Generative AI and jobs: A 2025 update",
-                "url": "https://www.ilo.org/publications/generative-ai-and-jobs-2025-update",
+                "url": "https://www.ilo.org/publications/generative-ai-and-jobs-refined-global-index-occupational-exposure",
                 "supports": "The ILO's estimates of occupational exposure to generative AI and its finding that job transformation is more likely than wholesale redundancy for most occupations."
             }
         ]
@@ -42,7 +42,7 @@ TOPICS = {
             },
             {
                 "title": "UN Global Risk Report 2026",
-                "url": "https://www.un.org/global-risk-report",
+                "url": "https://www.un.org/en/global-risk-report",
                 "supports": "The 2026 UN stakeholder survey's reported perceptions of global risks, including AI and concentration of power; perceptions are not predictions."
             }
         ]
