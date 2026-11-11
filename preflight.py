@@ -2,8 +2,14 @@
 
 Reports only whether required settings are present; never prints secret values.
 """
+import json
 import os
 import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+
+HISTORY_FILE = Path(__file__).resolve().with_name("history.json")
 
 
 def inspect_config(environ=None):
@@ -58,6 +64,60 @@ def inspect_config(environ=None):
     return checks, errors
 
 
+def record_preflight_failure(checks, errors, environ=None):
+    """Persist configuration failures without ever copying secret values into history."""
+    e = os.environ if environ is None else environ
+    try:
+        if HISTORY_FILE.exists():
+            history = json.loads(HISTORY_FILE.read_text(encoding="utf-8"))
+        else:
+            history = {}
+        history.setdefault("posts", [])
+        history.setdefault("patterns", {})
+        history.setdefault("runs", [])
+
+        run_id = str(e.get("GITHUB_RUN_ID", "")).strip() or None
+        run_attempt = str(e.get("GITHUB_RUN_ATTEMPT", "")).strip() or None
+        if run_id and any(
+            item.get("run_id") == run_id and item.get("run_attempt") == run_attempt
+            for item in history["runs"]
+        ):
+            return
+
+        platform_names = {"YouTube", "Facebook Page", "Instagram Reels", "TikTok inbox"}
+        platforms = {}
+        for name, _ok, state in checks:
+            if name in platform_names:
+                platforms[name] = {
+                    "status": (
+                        "blocked" if state == "incomplete"
+                        else "skipped" if state == "disabled"
+                        else "configuration_ready"
+                    ),
+                    "configuration_state": state,
+                }
+
+        history["runs"].append({
+            "time": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "run_id": run_id,
+            "run_attempt": run_attempt,
+            "format": str(e.get("FORCE_FORMAT", "")).strip() or "short",
+            "status": "preflight_failed",
+            "generated": False,
+            "failed_stage": "configuration preflight",
+            "error": "; ".join(str(error) for error in errors)[:900],
+            "checks": [{"name": name, "ready": bool(ok), "state": state}
+                       for name, ok, state in checks],
+            "platforms": platforms,
+        })
+        history["posts"] = history["posts"][-500:]
+        history["runs"] = history["runs"][-500:]
+        HISTORY_FILE.write_text(json.dumps(history, indent=2), encoding="utf-8")
+    except Exception as exc:
+        # Preserve the original preflight failure even if history storage is unavailable.
+        print("Could not persist preflight failure:", type(exc).__name__)
+
+
 def main():
     checks, errors = inspect_config()
     print("Scary Autopilot configuration check")
@@ -67,6 +127,7 @@ def main():
         print("Configuration errors:")
         for error in errors:
             print(f"- {error}")
+        record_preflight_failure(checks, errors)
         return 1
     print("Preflight passed. Disabled platforms will not receive posts.")
     return 0
