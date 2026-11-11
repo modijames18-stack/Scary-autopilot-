@@ -20,6 +20,8 @@ from urllib.parse import urlparse
 import requests
 import anthropic
 
+from evidence_library import evidence_catalogue_text, sources_for_topic
+
 ROOT = Path(__file__).parent
 HISTORY_FILE = ROOT / "history.json"
 WORK = ROOT / "work"
@@ -157,6 +159,8 @@ def yt_credentials():
 # ---------------------------------------------------------------- 1. research
 def research(fmt, hist):
     """Research current public-interest future risks, cached once per day and format."""
+    if not env("YT_REFRESH_TOKEN"):
+        return "Audience-interest research skipped because YouTube OAuth is not configured; use the curated evidence catalogue and do not treat popularity as proof."
     cached = hist["patterns"].get(fmt)
     if cached and cached.get("date") == TODAY:
         return cached["notes"]
@@ -193,6 +197,7 @@ def research(fmt, hist):
 # ---------------------------------------------------------------- 2. script
 def write_script(fmt, patterns, hist):
     recent = [p["title"] for p in hist["posts"][-40:]]
+    evidence_catalogue = evidence_catalogue_text()
     if fmt == "short":
         spec = ("A SHORT vertical explainer, 120-150 spoken words, about 50 seconds. "
                 "Open with a gripping question or plausible scenario. Explain one real risk "
@@ -213,6 +218,11 @@ future technologies humanity may struggle to govern.
 Research notes and audience-interest patterns (not proof):
 {patterns}
 
+Curated authoritative evidence catalogue (use this as the factual starting point; do not invent claims or URLs):
+{evidence_catalogue}
+
+Choose exactly ONE topic using the exact topic name from the catalogue. The hypothetical idea of a single world government must remain explicitly hypothetical; existing UN cooperation is not a world government.
+
 Titles already used (avoid repeating them):
 {recent}
 
@@ -226,10 +236,8 @@ Investigative documentary rules (mandatory):
   A hypothetical scenario must be explicitly described as hypothetical.
 - Use specific, checkable evidence. Never invent statistics, studies, report titles, quotations,
   experts, dates, or source URLs. If a precise claim cannot be supported, omit it or qualify it.
-- Include 2-5 real source entries in the JSON. Prefer primary and authoritative sources such as
-  peer-reviewed research, government science agencies, UN bodies, the ILO, World Bank, WHO, IPCC,
-  IEA, and official infrastructure or company reports. Each source must have a real title and exact
-  public URL that directly supports a claim in the script. Do not use other YouTube videos as evidence.
+- Ground factual statements in the supplied evidence catalogue. Do not invent statistics, study findings, source titles, or URLs. Keep forecasts and what-if scenarios clearly separate from documented facts.
+- The application will attach the exact reachable sources from the selected catalogue topic. Do not substitute other sources.
 - Explain uncertainty, limitations, and competing viewpoints fairly. Avoid claiming that a forecast
   is certain or that a worst-case scenario is inevitable.
 - Use serious, confident, human narration; cinematic pacing, meaningful pauses, and suspense created
@@ -242,6 +250,7 @@ Investigative documentary rules (mandatory):
 - Research notes above indicate audience interest only; they are NOT factual evidence.
 
 Reply with ONLY a JSON object with these keys:
+"topic": exact topic name selected from the evidence catalogue,
 "title": under 85 characters, specific and curiosity-driven, no hashtags,
 "description": 2-3 accurate sentences; disclose clearly if discussing a hypothetical scenario,
 "tags": list of up to 10 short tags,
@@ -309,7 +318,7 @@ def make_visual_plan(narration):
 def parse_meta(raw):
     start, end = raw.find("{"), raw.rfind("}")
     meta = json.loads(raw[start:end + 1], strict=False)
-    for k in ("title", "description", "narration", "visual_keywords"):
+    for k in ("topic", "title", "description", "narration", "visual_keywords"):
         if k not in meta:
             raise ValueError(f"Script missing '{k}'")
     meta.setdefault("tags", [])
@@ -322,36 +331,46 @@ def parse_meta(raw):
 
 
 def verify_source_links(meta):
-    """Keep only reachable sources on recognized research or public-institution domains."""
-    trusted_suffixes = (
-        ".gov", ".gov.uk", ".gov.au", ".gov.et", ".edu", ".int", ".un.org",
-        ".worldbank.org", ".ilo.org", ".oecd.org", ".who.int", ".ipcc.ch",
-        ".iea.org", ".imf.org", ".nasa.gov", ".noaa.gov", ".nature.com",
-        ".science.org", ".pnas.org", ".nationalacademies.org", ".ec.europa.eu",
+    """Attach only curated sources for the chosen topic and verify that links are reachable."""
+    topic = str(meta.get("topic", "")).strip()
+    candidates = sources_for_topic(topic)
+    if len(candidates) < 2:
+        raise ValueError(f"Unknown or unsupported documentary topic: {topic!r}")
+
+    trusted_domains = (
+        "ilo.org", "un.org", "unwater.org", "iea.org", "itu.int",
+        "ipcc.ch", "noaa.gov", "epa.gov",
     )
     verified = []
-    for source in meta.get("sources", []):
-        if not isinstance(source, dict):
-            continue
+    for source in candidates:
         url = str(source.get("url", "")).strip()
-        title = str(source.get("title", "")).strip()
-        supports = str(source.get("supports", "")).strip()
         host = (urlparse(url).hostname or "").lower()
-        trusted = any(host == suffix.lstrip(".") or host.endswith(suffix) for suffix in trusted_suffixes)
-        if not title or not supports or not url.startswith("https://") or not trusted:
+        trusted = any(host == domain or host.endswith("." + domain) for domain in trusted_domains)
+        if not url.startswith("https://") or not trusted:
+            print("Rejected non-approved evidence URL:", url)
             continue
         try:
-            response = requests.get(url, timeout=20, headers={"User-Agent": "ScaryAutopilotResearch/1.0"})
-            if response.ok and response.url.startswith("https://"):
+            response = requests.get(
+                url, timeout=25,
+                headers={"User-Agent": "ScaryAutopilotResearch/1.0"},
+                allow_redirects=True,
+            )
+            final_url = str(getattr(response, "url", url))
+            if response.ok and final_url.startswith("https://"):
                 verified.append(source)
+            else:
+                print("Evidence source unavailable:", url, getattr(response, "status_code", "?"))
         except requests.RequestException as exc:
-            print("Source link check failed:", url, str(exc)[:160])
-    meta["sources"] = verified
-    if len(verified) < 2:
-        raise ValueError("Fewer than two reachable sources from recognized research or public-institution domains; refusing to produce an unsourced documentary.")
-    print(f"Source link check passed: {len(verified)} reachable authoritative links")
-    return meta
+            print("Evidence source check failed:", url, str(exc)[:160])
 
+    if len(verified) < 2:
+        raise ValueError(
+            f"Only {len(verified)} curated sources were reachable for {topic!r}; "
+            "refusing to produce an insufficiently sourced documentary."
+        )
+    meta["sources"] = verified
+    print(f"Evidence check passed for {topic}: {len(verified)} curated authoritative sources")
+    return meta
 
 # ---------------------------------------------------------------- 3. voice + captions
 async def _tts(text, mp3_path):
