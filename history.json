@@ -65,6 +65,19 @@
       "platforms": {},
       "failed_stage": "script and evidence validation",
       "error": "FORECAST section must qualify uncertainty rather than state certainty."
+    },
+    {
+      "time": "2026-11-11T12:49:12Z",
+      "github_run_id": "43023497626",
+      "github_run_attempt": "1",
+      "github_event": "schedule",
+      "format": "short",
+      "topic": "Water scarcity and drying rivers",
+      "status": "generation_failed",
+      "generated": false,
+      "platforms": {},
+      "failed_stage": "script and evidence validation",
+      "error": "Configured AI provider unavailable; safe documentary generation stopped."
     }
   ]
 }
