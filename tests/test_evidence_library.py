@@ -47,6 +47,23 @@ class EvidenceLibraryTests(unittest.TestCase):
             for source in checked["sources"]
         ))
 
+    def test_topic_rotation_is_deliberate_and_environmentally_weighted(self):
+        history = {"posts": []}
+        sequence = []
+        for _ in range(9):
+            topic = autopilot.choose_topic(history)
+            sequence.append(topic)
+            history["posts"].append({"topic": topic})
+        self.assertEqual(len(set(sequence)), 9)
+        environmental = {
+            "Water scarcity and drying rivers",
+            "Climate change, extreme weather and food security",
+            "Ocean warming, sea-level rise and glacier loss",
+            "Air pollution and health",
+            "Red or discolored rivers and harmful algal blooms",
+        }
+        self.assertGreaterEqual(sum(topic in environmental for topic in sequence), 4)
+
     def test_unknown_topic_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "Unknown or unsupported"):
             autopilot.verify_source_links({"topic": "a made-up topic"})
