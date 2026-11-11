@@ -289,7 +289,7 @@ Investigative documentary rules (mandatory):
   is certain or that a worst-case scenario is inevitable.
 - Use serious, confident, human narration; cinematic pacing, meaningful pauses, and suspense created
   by evidence and unanswered questions—not fake scares, gore, or exaggerated claims.
-- End with practical responses and one thoughtful question that invites discussion.
+- End with practical responses and make the final spoken sentence a thoughtful viewer question ending in a question mark. Do not place a sign-off or any text after it.
 - Visual search phrases must describe authentic documentary footage relevant to each section:
   real workplaces, workers, data centres, power grids, reservoirs, rivers, farms, laboratories,
   scientific fieldwork, public infrastructure, and affected communities. Never request haunted-house
@@ -386,11 +386,11 @@ def ensure_viewer_question(meta, fmt):
     """Guarantee a spoken closing question without changing evidence or sources."""
     narration = str(meta.get("narration", "")).strip()
     # Treat a question followed by closing quotation marks as a valid ending.
-    if re.search(r"\\?\\s*[\\\"'”’)]*\\s*$", narration):
+    if re.search(r"\?\s*[\"'”’)]*\s*$", narration):
         return meta
     closing_question = "What should we do first?"
     repaired = (narration.rstrip() + " " + closing_question).strip()
-    words = re.findall(r"\\b[\\w’'-]+\\b", repaired)
+    words = re.findall(r"\b[\w’'-]+\b", repaired)
     if fmt == "short" and len(words) > 160:
         raise ValueError(
             "Short documentary narration is too long to add its required closing question "
