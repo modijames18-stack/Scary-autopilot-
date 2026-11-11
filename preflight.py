@@ -37,6 +37,10 @@ def inspect_config(environ=None):
     platforms = [
         ("YouTube", "ENABLE_YOUTUBE_UPLOAD", ("YT_CLIENT_ID", "YT_CLIENT_SECRET", "YT_REFRESH_TOKEN")),
         ("Facebook Page", "ENABLE_FACEBOOK_PUBLISH", ("FB_PAGE_ID", "FB_PAGE_TOKEN")),
+        ("Instagram Reels", "ENABLE_INSTAGRAM_PUBLISH", (
+            "IG_USER_ID", "FB_PAGE_TOKEN", "CLOUDINARY_CLOUD_NAME",
+            "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET",
+        )),
         ("TikTok inbox", "ENABLE_TIKTOK_UPLOAD", ("TIKTOK_ACCESS_TOKEN",)),
     ]
     for label, switch, secrets in platforms:
