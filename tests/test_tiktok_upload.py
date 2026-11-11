@@ -28,6 +28,8 @@ class TikTokInboxUploadTests(unittest.TestCase):
         request = post.call_args
         self.assertIn("/video/init/", request.args[0])
         self.assertEqual(request.kwargs["json"]["source_info"]["source"], "FILE_UPLOAD")
+        self.assertEqual(request.kwargs["json"]["source_info"]["chunk_size"], 16)
+        self.assertEqual(request.kwargs["json"]["source_info"]["total_chunk_count"], 1)
         self.assertEqual(put.call_count, 1)
         self.assertEqual(put.call_args.kwargs["headers"]["Content-Range"],
                          "bytes 0-15/16")
