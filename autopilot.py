@@ -546,7 +546,7 @@ def validate_documentary_script(meta, expected_topic, fmt):
 
     # Reject recognisable fictional-horror framing before voice or video is rendered.
     fiction_patterns = (
-        (r"\b(?:one|that)\s+(?:morning|night|evening)\s+when\s+[A-Z][a-z]{2,}\b", 0),
+        (r"\b(?:[Oo]ne|[Tt]hat)\s+(?:[Mm]orning|[Nn]ight|[Ee]vening)\s+when\s+[A-Z][a-z]{2,}\b", 0),
         (r"\b(?:a|the)\s+(?:man|woman|boy|girl|family|town|village)\s+(?:named|called)\b", re.IGNORECASE),
         (r"\b(?:ghost|haunted|phantom|monster|demon|no reflection|the phone rang|a phone rang|"
          r"the last train to|the house that|the road that)\b", re.IGNORECASE),
