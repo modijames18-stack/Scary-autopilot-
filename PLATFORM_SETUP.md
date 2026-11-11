@@ -11,6 +11,14 @@ This document describes what is implemented and what is required before enabling
 | Instagram | Not implemented | Professional Instagram account linked to a Facebook Page, Meta app permissions, Instagram account ID, and public HTTPS video hosting |
 | TikTok | Not implemented; previous code only skipped it | A compliant TikTok developer app and approved scopes; see restrictions below |
 
+## Documentary research and evidence
+
+The script writer receives a curated evidence catalogue covering AI and jobs, AI governance, water scarcity, power-grid resilience, internet infrastructure, climate and food security, and harmful algal blooms. The selected topic determines which exact source links are attached to the video. The runner checks that at least two approved source links are reachable before producing a documentary.
+
+YouTube OAuth is optional for audience-interest research. If no YouTube refresh token is configured, the workflow skips that optional popularity research and continues using the curated evidence catalogue. Popular videos are never treated as factual evidence.
+
+A reachable source link is not, by itself, proof that every narration sentence is supported. Scripts must stay within the supplied source summaries, label forecasts and hypothetical scenarios, and should be reviewed before public release.
+
 ## Publishing safety switches
 
 The scheduled workflow runs every three hours, but social publishing is disabled unless the repository owner explicitly enables it. Add these GitHub Actions **Variables** only after reviewing a generated video and deciding to allow that platform to publish:
