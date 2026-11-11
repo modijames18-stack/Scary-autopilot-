@@ -41,6 +41,9 @@ jobs:
       - name: Check Python syntax
         run: python -m py_compile autopilot.py resilient_runner.py preflight.py
 
+      - name: Run automated unit tests
+        run: python -m unittest discover -s tests -v
+
       - name: Check platform configuration
         env:
           AI_PROVIDER: ${{ vars.AI_PROVIDER }}
