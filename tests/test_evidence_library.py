@@ -13,6 +13,19 @@ class EvidenceLibraryTests(unittest.TestCase):
                 self.assertGreaterEqual(len(item["sources"]), 2)
                 self.assertTrue(all(s["url"].startswith("https://") for s in item["sources"]))
 
+    def test_ai_jobs_and_global_risk_sources_use_verified_official_pages(self):
+        ai_urls = [source["url"] for source in sources_for_topic("AI and jobs")]
+        governance_urls = [
+            source["url"] for source in
+            sources_for_topic("Global AI governance and concentration of power")
+        ]
+        self.assertIn(
+            "https://www.ilo.org/publications/generative-ai-and-jobs-refined-global-index-occupational-exposure",
+            ai_urls,
+        )
+        self.assertIn("https://www.un.org/en/global-risk-report", governance_urls)
+        self.assertNotIn("https://www.un.org/global-risk-report", governance_urls)
+
     def test_catalogue_includes_topic_names_and_source_urls(self):
         catalogue = evidence_catalogue_text()
         for topic, item in TOPICS.items():
