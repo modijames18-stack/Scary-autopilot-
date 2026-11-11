@@ -46,7 +46,7 @@ Official docs: [TikTok Direct Post](https://developers.tiktok.com/docs/en/conten
 
 ## How the video pipeline works
 
-1. Select a topic from the curated evidence catalogue: AI and jobs, water scarcity and drying rivers, climate and extreme weather, power/internet infrastructure, energy, food security, ecosystems, and other credible future risks.
+1. Select the next topic from a deliberate, non-random evidence-backed rotation. Environmental investigations are intentionally frequent: water scarcity and drying rivers, climate and extreme weather, ocean warming and glacier loss, air pollution, and river ecosystems. The rotation also covers AI and jobs, energy, power grids, and internet infrastructure.
 2. Write a short investigative script grounded in approved institutional sources.
 3. Label documented facts, credible forecasts, and hypothetical scenarios clearly.
 4. Create narration and captions, then build a vertical video using scene-by-scene documentary footage searches.
