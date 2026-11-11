@@ -405,7 +405,7 @@ def validate_documentary_script(meta, expected_topic, fmt):
             "Documentary narration must clearly separate FACT, FORECAST, and WHAT-IF; "
             f"missing labels: {', '.join(missing)}."
         )
-    if not re.search(r"\\?\\s*[\\"'”’)]*\\s*$", narration):
+    if not narration.endswith("?"):
         raise ValueError("Documentary narration must end with a thoughtful viewer question.")
     if len(meta.get("sources", [])) < 2:
         raise ValueError("Documentary must cite at least two curated institutional sources.")
