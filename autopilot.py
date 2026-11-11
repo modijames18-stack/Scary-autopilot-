@@ -765,8 +765,17 @@ def post_tiktok_inbox(video, meta):
 def daily_report(hist):
     posts_today = [p for p in hist["posts"] if p["time"][:10] == TODAY]
     s = sum(1 for p in posts_today if p["format"] == "short")
-    lines = [f"📊 Daily report {TODAY}",
-             f"Posted today: {len(posts_today)} videos ({s} short, {len(posts_today) - s} long)"]
+    youtube_count = sum(1 for p in posts_today if p.get("youtube_id"))
+    facebook_count = sum(1 for p in posts_today if p.get("facebook_id"))
+    instagram_count = sum(1 for p in posts_today if p.get("instagram_id"))
+    tiktok_count = sum(1 for p in posts_today if p.get("tiktok_inbox_id"))
+    lines = [
+        f"📊 Daily report {TODAY}",
+        f"Videos generated: {len(posts_today)} ({s} short, {len(posts_today) - s} long)",
+        f"Platform deliveries: YouTube {youtube_count}; Facebook {facebook_count}; "
+        f"Instagram {instagram_count}; TikTok inbox {tiktok_count}",
+        "TikTok inbox deliveries are drafts awaiting creator publishing.",
+    ]
 
     if env("YT_REFRESH_TOKEN"):
         try:
