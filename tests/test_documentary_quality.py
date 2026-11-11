@@ -109,6 +109,39 @@ class DocumentaryQualityTests(unittest.TestCase):
 
 
 class RunHistoryTests(unittest.TestCase):
+    def test_github_run_context_is_persisted_without_secrets(self):
+        with patch.dict("os.environ", {
+            "GITHUB_RUN_ID": "123456",
+            "GITHUB_RUN_ATTEMPT": "2",
+            "GITHUB_EVENT_NAME": "schedule",
+        }, clear=True):
+            self.assertEqual(autopilot.github_run_context(), {
+                "github_run_id": "123456",
+                "github_run_attempt": "2",
+                "github_event": "schedule",
+            })
+
+    def test_disabled_platforms_are_delivery_issues_not_completion(self):
+        platforms = {
+            "youtube": {"status": "skipped"},
+            "facebook": {"status": "skipped"},
+            "instagram": {"status": "skipped"},
+            "tiktok": {"status": "skipped"},
+        }
+        self.assertEqual(
+            autopilot.delivery_completion_status(platforms),
+            "completed_with_delivery_issues",
+        )
+
+    def test_all_verified_handoffs_are_marked_completed(self):
+        platforms = {
+            "youtube": {"status": "verified_upload"},
+            "facebook": {"status": "verified_publish"},
+            "instagram": {"status": "verified_publish"},
+            "tiktok": {"status": "inbox_uploaded"},
+        }
+        self.assertEqual(autopilot.delivery_completion_status(platforms), "completed")
+
     def test_legacy_history_gets_a_runs_collection_and_persists_it(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "history.json"
