@@ -37,6 +37,21 @@ class EvidenceLibraryTests(unittest.TestCase):
         )
         self.assertNotEqual(checked["sources"][0]["title"], "invented")
 
+    def test_all_curated_topics_pass_the_institutional_domain_allowlist(self):
+        class Reachable:
+            ok = True
+            url = "https://www.ilo.org/example"
+
+        with patch("autopilot.requests.get", return_value=Reachable()):
+            for topic in TOPICS:
+                with self.subTest(topic=topic):
+                    checked = autopilot.verify_source_links({"topic": topic, "sources": []})
+                    self.assertGreaterEqual(len(checked["sources"]), 2)
+                    self.assertEqual(
+                        [source["url"] for source in checked["sources"]],
+                        [source["url"] for source in sources_for_topic(topic)],
+                    )
+
     def test_source_verifier_keeps_curated_sources_when_sites_block_ci(self):
         meta = {"topic": "AI and jobs", "sources": []}
         with patch("autopilot.requests.get", side_effect=autopilot.requests.RequestException("blocked")):
