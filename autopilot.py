@@ -325,8 +325,9 @@ Reply with ONLY a JSON object with these keys:
                 "Reply with ONLY the same JSON object (same keys).\n\n" + json.dumps(meta),
                 max_tokens=1200, json_mode=True,
             )
+            polished = ensure_viewer_question(parse_meta(better), fmt)
             meta = validate_documentary_script(
-                verify_source_links(parse_meta(better)), expected_topic=topic, fmt=fmt
+                verify_source_links(polished), expected_topic=topic, fmt=fmt
             )
         except Exception as e:
             print("Polish pass skipped:", e)
