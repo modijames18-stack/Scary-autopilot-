@@ -309,8 +309,9 @@ Reply with ONLY a JSON object with these keys:
         "Be compelling, evidence-aware, balanced, and solution-focused.",
         prompt, max_tokens=1200 if fmt == "short" else 5000, json_mode=True,
     )
+    meta = ensure_viewer_question(parse_meta(raw), fmt)
     meta = validate_documentary_script(
-        verify_source_links(parse_meta(raw)), expected_topic=topic, fmt=fmt
+        verify_source_links(meta), expected_topic=topic, fmt=fmt
     )
 
     if fmt == "short":
@@ -378,6 +379,24 @@ def parse_meta(raw):
         raise ValueError("Script sources must be a list")
     if not isinstance(meta["visual_keywords"], list) or len(meta["visual_keywords"]) < 4:
         raise ValueError("Script must include at least four documentary footage search phrases")
+    return meta
+
+
+def ensure_viewer_question(meta, fmt):
+    """Guarantee a spoken closing question without changing evidence or sources."""
+    narration = str(meta.get("narration", "")).strip()
+    # Treat a question followed by closing quotation marks as a valid ending.
+    if re.search(r"\\?\\s*[\\\"'”’)]*\\s*$", narration):
+        return meta
+    closing_question = "What should we do first?"
+    repaired = (narration.rstrip() + " " + closing_question).strip()
+    words = re.findall(r"\\b[\\w’'-]+\\b", repaired)
+    if fmt == "short" and len(words) > 160:
+        raise ValueError(
+            "Short documentary narration is too long to add its required closing question "
+            f"without editing evidence; got {len(words)} words."
+        )
+    meta["narration"] = repaired
     return meta
 
 
