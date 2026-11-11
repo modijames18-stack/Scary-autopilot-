@@ -21,7 +21,7 @@ from urllib.parse import urlparse
 import requests
 import anthropic
 
-from evidence_library import evidence_catalogue_text, sources_for_topic
+from evidence_library import TOPICS, evidence_catalogue_text, sources_for_topic
 
 ROOT = Path(__file__).parent
 HISTORY_FILE = ROOT / "history.json"
@@ -195,9 +195,41 @@ def research(fmt, hist):
     return notes
 
 
+TOPIC_ROTATION = [
+    "Water scarcity and drying rivers",
+    "AI and jobs",
+    "Climate change, extreme weather and food security",
+    "Power-grid resilience and worldwide blackout scenarios",
+    "Ocean warming, sea-level rise and glacier loss",
+    "Global AI governance and concentration of power",
+    "Air pollution and health",
+    "Internet infrastructure and global connectivity",
+    "Red or discolored rivers and harmful algal blooms",
+]
+
+
+def choose_topic(hist):
+    """Choose the next evidence-backed topic in a deliberate, non-random rotation."""
+    posts = hist.get("posts", [])
+    previous = posts[-1].get("topic") if posts else None
+    try:
+        start = TOPIC_ROTATION.index(previous)
+    except ValueError:
+        start = -1
+    for offset in range(1, len(TOPIC_ROTATION) + 1):
+        candidate = TOPIC_ROTATION[(start + offset) % len(TOPIC_ROTATION)]
+        if candidate in TOPICS:
+            return candidate
+    raise RuntimeError("No curated documentary topics are available")
+
+
 # ---------------------------------------------------------------- 2. script
-def write_script(fmt, patterns, hist):
+def write_script(fmt, patterns, hist, topic=None):
+    topic = topic or choose_topic(hist)
+    if topic not in TOPICS:
+        raise ValueError(f"Topic is not in the curated evidence catalogue: {topic}")
     recent = [p["title"] for p in hist["posts"][-40:]]
+    recent_topics = [p.get("topic", "unknown") for p in hist["posts"][-8:]]
     evidence_catalogue = evidence_catalogue_text()
     if fmt == "short":
         spec = ("A SHORT vertical explainer, 120-150 spoken words, about 50 seconds. "
@@ -210,11 +242,11 @@ def write_script(fmt, patterns, hist):
     prompt = f"""Create an ORIGINAL, realistic, thought-provoking future-risk documentary for a faceless channel.
 {spec}
 
-Choose one topic per video, rotating among: AI replacing or changing jobs; concentration of power
-and the hypothetical idea of one-world government; a worldwide internet or power outage; water
-scarcity, drying rivers and drought; rivers turning red due to algae, pollution or other natural
-causes; climate change and extreme weather; threats to food, health, energy and ecosystems; and
-future technologies humanity may struggle to govern.
+This episode's required topic is exactly: {topic}
+Do not switch to a different topic. The topic was selected by a deliberate rotation from the
+curated evidence catalogue, not randomly. Environmental investigations are intentionally frequent,
+including water scarcity, climate extremes, ocean warming, glacier loss, air pollution, and river
+ecosystem health. Other episodes cover AI, jobs, energy, and infrastructure risks.
 
 Research notes and audience-interest patterns (not proof):
 {patterns}
@@ -222,7 +254,7 @@ Research notes and audience-interest patterns (not proof):
 Curated authoritative evidence catalogue (use this as the factual starting point; do not invent claims or URLs):
 {evidence_catalogue}
 
-Choose exactly ONE topic using the exact topic name from the catalogue. The hypothetical idea of a single world government must remain explicitly hypothetical; existing UN cooperation is not a world government.
+Use the exact required topic above and its matching evidence section from the catalogue. The hypothetical idea of a single world government must remain explicitly hypothetical; existing UN cooperation is not a world government.
 
 Titles already used (avoid repeating them):
 {recent}
@@ -346,7 +378,7 @@ def verify_source_links(meta):
 
     trusted_domains = (
         "ilo.org", "un.org", "unwater.org", "iea.org", "itu.int",
-        "ipcc.ch", "noaa.gov", "epa.gov",
+        "ipcc.ch", "noaa.gov", "epa.gov", "wmo.int", "who.int",
     )
     approved = []
     for source in candidates:
@@ -848,13 +880,14 @@ def main():
         return
 
     fmt = pick_format()
+    topic = choose_topic(hist)
     try:
         try:
             patterns = research(fmt, hist)
         except Exception as e:
             print("Research failed:", e)
             patterns = "(audience research unavailable; use established evidence, primary sources, balanced uncertainty, and an investigative documentary structure; do not invent events or claims)"
-        meta = write_script(fmt, patterns, hist)
+        meta = write_script(fmt, patterns, hist, topic=topic)
         duration = make_voice_and_captions(fmt, meta["narration"])
         video = build_video(fmt, meta, duration)
     except Exception:
@@ -862,7 +895,7 @@ def main():
         save_history(hist)
         raise SystemExit(1)
 
-    record = {"time": NOW.strftime("%Y-%m-%dT%H:%M:%SZ"), "format": fmt, "title": meta["title"]}
+    record = {"time": NOW.strftime("%Y-%m-%dT%H:%M:%SZ"), "format": fmt, "title": meta["title"], "topic": meta["topic"]}
     msgs = []
 
     yt_today = sum(1 for p in hist["posts"] if p.get("youtube_id") and p["time"][:10] == TODAY)
