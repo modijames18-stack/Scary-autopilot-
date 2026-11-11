@@ -599,7 +599,54 @@ def post_facebook(video, meta, fmt):
     return j.get("id")
 
 
-# TikTok: add after TikTok approves your app (see SETUP.md). Until then it is skipped.
+def post_tiktok_inbox(video, meta):
+    """Upload a video to the creator's TikTok inbox; the creator completes publishing in TikTok.
+
+    TikTok's video.upload scope is used intentionally: unattended direct publishing
+    requires video.publish approval and an explicit creator-consent/export flow.
+    """
+    token = env("TIKTOK_ACCESS_TOKEN")
+    if not token:
+        raise RuntimeError("TIKTOK_ACCESS_TOKEN is not configured")
+    size = os.path.getsize(video)
+    if size <= 0:
+        raise RuntimeError("TikTok upload file is empty")
+    chunk_size = 10 * 1024 * 1024
+    chunks = (size + chunk_size - 1) // chunk_size
+    endpoint = "https://open.tiktokapis.com/v2/post/publish/inbox/video/init/"
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json; charset=UTF-8"}
+    init = requests.post(endpoint, headers=headers, json={"source_info": {
+        "source": "FILE_UPLOAD", "video_size": size,
+        "chunk_size": chunk_size, "total_chunk_count": chunks,
+    }}, timeout=60)
+    if not init.ok:
+        raise RuntimeError(f"TikTok init failed {init.status_code}: {init.text[:500]}")
+    payload = init.json()
+    err = payload.get("error", {})
+    if err.get("code") not in (None, "", "ok"):
+        raise RuntimeError(f"TikTok init rejected: {err.get('code')} {err.get('message', '')}")
+    data = payload.get("data", {})
+    upload_url, publish_id = data.get("upload_url"), data.get("publish_id")
+    if not upload_url or not publish_id:
+        raise RuntimeError("TikTok did not return upload_url and publish_id")
+    with open(video, "rb") as stream:
+        for index in range(chunks):
+            start = index * chunk_size
+            block = stream.read(chunk_size)
+            end = start + len(block) - 1
+            upload_headers = {
+                "Content-Type": "video/mp4",
+                "Content-Length": str(len(block)),
+                "Content-Range": f"bytes {start}-{end}/{size}",
+            }
+            response = requests.put(upload_url, headers=upload_headers, data=block, timeout=900)
+            if response.status_code not in (200, 201, 206):
+                raise RuntimeError(f"TikTok chunk {index + 1}/{chunks} failed "
+                                   f"{response.status_code}: {response.text[:400]}")
+    return publish_id
+
+
+# TikTok inbox upload uses video.upload; the creator must finish publishing in TikTok.
 
 
 # ---------------------------------------------------------------- 6. report
@@ -708,6 +755,17 @@ def main():
             notify(f"❌ Facebook post failed: {str(e)[:700]}")
     elif not publishing_enabled("ENABLE_FACEBOOK_PUBLISH"):
         msgs.append("📘 Facebook skipped: publishing approval switch is off")
+
+    if publishing_enabled("ENABLE_TIKTOK_UPLOAD") and env("TIKTOK_ACCESS_TOKEN") and fmt == "short":
+        try:
+            record["tiktok_inbox_id"] = post_tiktok_inbox(video, meta)
+            msgs.append("🎵 TikTok: video uploaded to inbox; open TikTok notifications to review and publish")
+        except Exception as e:
+            notify(f"❌ TikTok inbox upload failed: {str(e)[:700]}")
+    elif not publishing_enabled("ENABLE_TIKTOK_UPLOAD"):
+        msgs.append("🎵 TikTok skipped: upload approval switch is off")
+    elif fmt != "short":
+        msgs.append("🎵 TikTok skipped: only short-format videos are sent to the inbox")
 
     hist["posts"].append(record)
     save_history(hist)
