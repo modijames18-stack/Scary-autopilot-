@@ -259,6 +259,9 @@ Use the exact required topic above and its matching evidence section from the ca
 Titles already used (avoid repeating them):
 {recent}
 
+Recent topics already covered (avoid unnecessary immediate repetition):
+{recent_topics}
+
 Investigative documentary rules (mandatory):
 - Make this feel like a high-quality investigative documentary, NEVER a fictional horror story.
 - Open with a striking question or documented real-world development, not an invented character,
