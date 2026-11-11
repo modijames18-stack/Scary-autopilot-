@@ -611,8 +611,14 @@ def post_tiktok_inbox(video, meta):
     size = os.path.getsize(video)
     if size <= 0:
         raise RuntimeError("TikTok upload file is empty")
-    chunk_size = 10 * 1024 * 1024
-    chunks = (size + chunk_size - 1) // chunk_size
+    # TikTok requires a single whole-file upload below 5 MB. For larger
+    # files, distribute bytes evenly across chunks (5–64 MB each).
+    if size <= 64 * 1024 * 1024:
+        chunks = 1
+        chunk_size = size
+    else:
+        chunks = (size + (10 * 1024 * 1024) - 1) // (10 * 1024 * 1024)
+        chunk_size = (size + chunks - 1) // chunks
     endpoint = "https://open.tiktokapis.com/v2/post/publish/inbox/video/init/"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json; charset=UTF-8"}
     init = requests.post(endpoint, headers=headers, json={"source_info": {
