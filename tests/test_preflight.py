@@ -14,25 +14,40 @@ class PreflightTests(unittest.TestCase):
         youtube = next(c for c in checks if c[0] == "YouTube")
         self.assertFalse(youtube[1])
 
-    def test_all_three_platforms_can_be_ready(self):
+    def test_all_four_platforms_can_be_ready(self):
         checks, errors = inspect_config({
             "GEMINI_API_KEY": "x", "PIXABAY_API_KEY": "x",
             "ENABLE_YOUTUBE_UPLOAD": "true",
             "YT_CLIENT_ID": "x", "YT_CLIENT_SECRET": "x", "YT_REFRESH_TOKEN": "x",
             "ENABLE_FACEBOOK_PUBLISH": "true", "FB_PAGE_ID": "x", "FB_PAGE_TOKEN": "x",
+            "ENABLE_INSTAGRAM_PUBLISH": "true", "IG_USER_ID": "x",
+            "CLOUDINARY_CLOUD_NAME": "x", "CLOUDINARY_API_KEY": "x",
+            "CLOUDINARY_API_SECRET": "x",
             "ENABLE_TIKTOK_UPLOAD": "true", "TIKTOK_ACCESS_TOKEN": "x",
         })
         self.assertEqual(errors, [])
-        self.assertTrue(all(c[1] for c in checks if c[0] in
-                            ("AI writing", "Stock footage", "YouTube", "Facebook Page", "TikTok inbox")))
+        expected = ("AI writing", "Stock footage", "YouTube", "Facebook Page",
+                    "Instagram Reels", "TikTok inbox")
+        self.assertTrue(all(c[1] for c in checks if c[0] in expected))
+
+    def test_instagram_missing_cloudinary_secret_fails(self):
+        checks, errors = inspect_config({
+            "GEMINI_API_KEY": "x", "PEXELS_API_KEY": "x",
+            "ENABLE_INSTAGRAM_PUBLISH": "true",
+            "IG_USER_ID": "x", "FB_PAGE_TOKEN": "x",
+            "CLOUDINARY_CLOUD_NAME": "x", "CLOUDINARY_API_KEY": "x",
+        })
+        self.assertTrue(any("CLOUDINARY_API_SECRET" in e for e in errors))
+        instagram = next(c for c in checks if c[0] == "Instagram Reels")
+        self.assertFalse(instagram[1])
 
     def test_disabled_platforms_are_not_errors(self):
         checks, errors = inspect_config({
             "GEMINI_API_KEY": "x", "PEXELS_API_KEY": "x",
         })
         self.assertEqual(errors, [])
-        self.assertTrue(all(not c[1] for c in checks if c[0] in
-                            ("YouTube", "Facebook Page", "TikTok inbox")))
+        labels = ("YouTube", "Facebook Page", "Instagram Reels", "TikTok inbox")
+        self.assertTrue(all(not c[1] for c in checks if c[0] in labels))
 
 
 if __name__ == "__main__":
