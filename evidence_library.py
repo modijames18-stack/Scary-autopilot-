@@ -140,6 +140,47 @@ TOPICS = {
             }
         ]
     },
+    "Ocean warming, sea-level rise and glacier loss": {
+        "evidence": [
+            "The World Meteorological Organization's 2026 State of the Climate update reports that 2026 is expected to be among the four warmest years on record, with record-high ocean heat and sea level in the satellite record. The update uses data available through September 2026 and is not the final annual report.",
+            "The WMO's 2025 report confirms that 2015–2025 were the hottest eleven years in the observational record and documents continuing ocean warming, glacier loss, and sea-level rise. Regional effects and future rates remain uncertain and should not be presented as identical everywhere."
+        ],
+        "sources": [
+            {
+                "title": "State of the Climate Update for COP31",
+                "url": "https://public.wmo.int/resources/publication-series/state-of-climate-update-cop/state-of-climate-update-cop31",
+                "supports": "The WMO's 2026 update on global temperature, ocean heat, sea level, glaciers, and climate risks using data available through September 2026."
+            },
+            {
+                "title": "State of the Global Climate 2025",
+                "url": "https://public.wmo.int/publication-series/state-of-global-climate/state-of-global-climate-2025",
+                "supports": "The WMO's annual assessment of 2015–2025 temperatures, ocean heat, sea level, glaciers, and extreme-weather impacts."
+            }
+        ]
+    },
+    "Air pollution and health": {
+        "evidence": [
+            "The World Health Organization identifies ambient and household air pollution as major environmental health risks. Exposure and health burdens vary by pollutant, place, age, household energy source, and access to cleaner alternatives.",
+            "The WHO's 2026 technical brief summarizes evidence linking air pollution with respiratory, cardiovascular, cerebrovascular, reproductive, and metabolic health effects. Avoid treating all pollutants or exposure levels as equally harmful."
+        ],
+        "sources": [
+            {
+                "title": "Health effects of air pollution: evidence and implications",
+                "url": "https://www.who.int/publications/i/item/B09563",
+                "supports": "The WHO's 2026 technical summary of evidence on air pollution exposure and health effects across multiple body systems."
+            },
+            {
+                "title": "Ambient (outdoor) air pollution",
+                "url": "https://www.who.int/news-room/fact-sheets/detail/ambient-%28outdoor%29-air-quality-and-health",
+                "supports": "The WHO's facts on outdoor air pollution, health effects, exposure, and policy measures to reduce emissions."
+            },
+            {
+                "title": "Household air pollution",
+                "url": "https://www.who.int/news-room/fact-sheets/detail/household-air-pollution-and-health",
+                "supports": "The WHO's evidence on household cooking fuels, exposure, health burdens, and access to clean cooking."
+            }
+        ]
+    },
     "Red or discolored rivers and harmful algal blooms": {
         "evidence": [
             "Water can appear red or otherwise discolored for several different reasons. Some harmful algal blooms can produce red, brown, green, or blue discoloration, but not all blooms are red and not all algal blooms are harmful.",
