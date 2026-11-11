@@ -91,6 +91,19 @@
       "platforms": {},
       "failed_stage": "script and evidence validation",
       "error": "Configured AI provider unavailable; safe documentary generation stopped."
+    },
+    {
+      "time": "2026-11-11T22:00:42Z",
+      "github_run_id": "43107926323",
+      "github_run_attempt": "1",
+      "github_event": "schedule",
+      "format": "short",
+      "topic": "Water scarcity and drying rivers",
+      "status": "generation_failed",
+      "generated": false,
+      "platforms": {},
+      "failed_stage": "script and evidence validation",
+      "error": "Configured AI provider unavailable; safe documentary generation stopped."
     }
   ]
 }
