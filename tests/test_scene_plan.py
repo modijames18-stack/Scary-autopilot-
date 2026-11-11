@@ -15,9 +15,9 @@ class VisualPlanTests(unittest.TestCase):
         with patch.object(autopilot, "ask_ai", return_value=json.dumps(payload)):
             plan = autopilot.make_visual_plan(narration, topic="AI and jobs")
         self.assertEqual(len(plan), 2)
-        self.assertIn("First sentence.", plan[0]["text"])
-        self.assertIn("Fourth sentence.", plan[1]["text"])
-        self.assertEqual(plan[0]["keywords"][0], "factory workers")
+        self.assertIn("AI is changing jobs.", plan[0]["text"])
+        self.assertIn("Factory employees need training.", plan[1]["text"])
+        self.assertEqual(plan[0]["keywords"][0], "AI workers in office")
 
     def test_rejects_missing_scene(self):
         narration = "First sentence. Second sentence. Third sentence. Fourth sentence."
