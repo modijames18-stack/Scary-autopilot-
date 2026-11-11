@@ -1,76 +1,72 @@
-# Scary Autopilot — setup and platform connections
+# Scary Autopilot — four-platform publishing
 
-The workflow runs every three hours in GitHub Actions. It creates evidence-led documentary videos, stores a short-lived video artifact, updates `history.json`, and sends optional Telegram alerts.
+The scheduled workflow runs every three hours (eight runs per day). Each scheduled run creates one original vertical short documentary and attempts delivery to all four connected destinations: YouTube Shorts, Facebook Reels, Instagram Reels, and TikTok inbox.
 
-## 1. Add repository secrets
+## Required account connections
 
-Open the repository on GitHub → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**.
+Add credentials in GitHub → repository → **Settings → Secrets and variables → Actions → Secrets**. Never paste tokens into chat or commit them into the repository.
 
-Add only the credentials for services you actually connect:
-
-| Secret | Purpose |
+| Secret | Used for |
 |---|---|
-| `GEMINI_API_KEY` | Gemini script writing and scene planning (recommended low-cost/free-tier AI option, subject to provider limits) |
-| `ANTHROPIC_API_KEY` | Optional Claude alternative |
-| `PEXELS_API_KEY` | Documentary footage fallback |
-| `PIXABAY_API_KEY` | Primary documentary footage search |
-| `YT_CLIENT_ID`, `YT_CLIENT_SECRET`, `YT_REFRESH_TOKEN` | YouTube OAuth upload and analytics |
-| `FB_PAGE_ID`, `FB_PAGE_TOKEN` | Facebook Page publishing and reporting |
-| `TIKTOK_ACCESS_TOKEN` | TikTok Content Posting API user token with `video.upload` permission |
+| `GEMINI_API_KEY` | Scriptwriting and documentary scene planning |
+| `PIXABAY_API_KEY` or `PEXELS_API_KEY` | Real documentary stock footage |
+| `YT_CLIENT_ID`, `YT_CLIENT_SECRET`, `YT_REFRESH_TOKEN` | YouTube upload |
+| `FB_PAGE_ID`, `FB_PAGE_TOKEN` | Facebook Page Reels |
+| `IG_USER_ID` | Instagram professional account ID |
+| `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Securely host the generated video at a public HTTPS URL for Instagram's media fetch |
+| `TIKTOK_ACCESS_TOKEN` | TikTok Content Posting API inbox upload (`video.upload` scope) |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Optional run alerts |
 
-Never paste tokens into source files, issues, or chat messages. If a token is exposed, revoke and replace it.
+Instagram publishing requires an Instagram **Professional** (Creator or Business) account, the required Meta app permissions, and an account linked to a Facebook Page. The Page access token must include the relevant Instagram publishing and Page permissions. Cloudinary is used because Instagram's publishing API must fetch the video from a publicly accessible HTTPS URL. A Cloudinary account and API credentials are required.
 
-## 2. Set repository Actions variables
+## Enable publishing
 
-Open **Settings → Secrets and variables → Actions → Variables** and add:
+Under **Settings → Secrets and variables → Actions → Variables**, add:
 
-| Variable | Suggested value | Meaning |
-|---|---|---|
-| `ENABLE_YOUTUBE_UPLOAD` | `false` | Set to `true` only after YouTube OAuth is tested |
-| `ENABLE_FACEBOOK_PUBLISH` | `false` | Set to `true` only after Page permissions are tested |
-| `ENABLE_TIKTOK_UPLOAD` | `false` | Set to `true` after TikTok OAuth is configured |
-| `YOUTUBE_PRIVACY` | `private` | Keep private until a test upload is reviewed |
-| `YOUTUBE_DAILY_UPLOADS` | `2` | Conservative daily upload cap |
-| `LONG_HOURS` | `6,18` | UTC hours for long documentaries |
-| `TTS_VOICE` | `en-US-ChristopherNeural` | Narration voice |
-| `REPORT_HOUR_UTC` | `21` | Daily report hour |
+| Variable | Value |
+|---|---|
+| `ENABLE_YOUTUBE_UPLOAD` | `true` after YouTube OAuth is authorized |
+| `ENABLE_FACEBOOK_PUBLISH` | `true` after Page publishing permission is granted |
+| `ENABLE_INSTAGRAM_PUBLISH` | `true` after Instagram/Meta permissions and Cloudinary are ready |
+| `ENABLE_TIKTOK_UPLOAD` | `true` after TikTok OAuth is authorized |
+| `YOUTUBE_PRIVACY` | Keep `private` for the first test; change only after reviewing the result |
+| `YOUTUBE_DAILY_UPLOADS` | `8` target (subject to the channel/API account's actual limits) |
+| `META_GRAPH_VERSION` | Optional; defaults to `v24.0` |
+| `TTS_VOICE` | Optional; defaults to `en-US-ChristopherNeural` |
 
-Publishing switches are deliberately off by default. Do not enable a platform until its credentials and account permissions are confirmed.
+The workflow's preflight checks every enabled platform before video generation. It reports missing secret names only and never prints secret values. Do not turn on a platform until its credentials are saved and tested.
 
-## 3. TikTok connection — important limitation
+## Important TikTok limitation
 
-The code can upload a short video to the TikTok inbox using the official Content Posting API `video.upload` scope. The creator must then open TikTok notifications, review the video, and complete publishing in the TikTok app.
+The current TikTok integration uploads each short video to the account's TikTok inbox using the official `video.upload` scope. The creator must open the TikTok notification, review the draft, and tap to publish. This is not unattended public posting.
 
-To connect it:
+TikTok's `video.publish` Direct Post requires approved app access, user authorization, creator information checks, and an explicit creator-consent/export flow. Unaudited apps are restricted to private visibility. The scheduled workflow does not bypass those requirements. The inbox upload means TikTok receives the video every three hours, but a person still completes public posting.
 
-1. Create or open your app at [TikTok for Developers](https://developers.tiktok.com/).
-2. Add the **Content Posting API** product and configure the video-upload permission.
-3. Complete TikTok's app review and OAuth authorization for the account you own.
-4. Obtain a user access token with the `video.upload` scope.
-5. Save it as the GitHub Actions secret `TIKTOK_ACCESS_TOKEN`.
-6. Set `ENABLE_TIKTOK_UPLOAD` to `true`.
+Official docs: [TikTok Direct Post](https://developers.tiktok.com/docs/en/content-posting-api-reference-direct-post), [TikTok Upload](https://developers.tiktok.com/docs/en/content-posting-api-reference-upload-video).
 
-TikTok direct auto-publishing is not enabled here. Its `video.publish` scope requires approval and a creator-consent/export flow, and unaudited clients are restricted to private visibility. This project does not bypass those requirements. Access tokens expire; if TikTok reports an expired token, re-authorize and replace the secret. The current workflow uploads **short-format videos only** to the inbox.
+## How the video pipeline works
 
-Official docs: [TikTok Content Posting API — Get Started](https://developers.tiktok.com/docs/en/content-posting-api-get-started), [Upload API](https://developers.tiktok.com/docs/en/content-posting-api-reference-upload-video).
+1. Select a topic from the curated evidence catalogue: AI and jobs, water scarcity and drying rivers, climate and extreme weather, power/internet infrastructure, energy, food security, ecosystems, and other credible future risks.
+2. Write a short investigative script grounded in approved institutional sources.
+3. Label documented facts, credible forecasts, and hypothetical scenarios clearly.
+4. Create narration and captions, then build a vertical video using scene-by-scene documentary footage searches.
+5. Refuse generic filler footage when a scene has no relevant footage.
+6. Attempt publishing to each enabled platform and record each platform's own returned post/upload ID.
+7. Send a run report and save the video artifact/history.
 
-## 4. YouTube and Facebook
+The default scheduled format is a short vertical documentary so the same video can be delivered to all four destinations on every three-hour run. A manual workflow dispatch can still force a long video for a separate YouTube/Facebook test.
 
-- YouTube uses OAuth refresh-token credentials and the YouTube Data API. Start with `YOUTUBE_PRIVACY=private`; review the video before changing to public.
-- Facebook requires a Page access token with the relevant Page video publishing permissions. Personal-profile publishing is not supported by this integration.
-- Meta and Google may require app review, verification, or account eligibility. A successful code deployment does not grant those permissions.
+## First live test
 
-## 5. Configuration preflight\n\nEvery scheduled run checks that an AI provider and at least one stock-footage provider are configured. If a platform switch is enabled but its required credentials are missing, the run stops before creating a video and reports exactly which credential names are missing (never their values). Platforms left disabled are clearly reported as disabled. This prevents silent skipped publishing.\n\n## 6. Run and review
+1. Save the required credentials in GitHub Actions Secrets.
+2. Enable the platform variables only after each account's OAuth/app permissions are granted.
+3. Keep YouTube privacy set to `private`.
+4. Open **Actions → Autopilot → Run workflow** and start one test run.
+5. Review the generated MP4 and check the run log for a confirmed result from each platform.
+6. Do not treat an uploaded TikTok inbox draft as a public post.
 
-1. Open the repository's **Actions** tab.
-2. Select **Autopilot** → **Run workflow**.
-3. Start with `report_only=false` and keep publishing switches off until a generated artifact is reviewed.
-4. Open the run and download the `last-video` artifact to inspect the MP4.
-5. Check the run logs and Telegram alert for failures.
+A successful code test does not mean that accounts are connected: live connection is confirmed only after the platform returns a successful upload/publish ID. Public posting and monetization remain subject to each platform's app review, account eligibility, quotas, and policies.
 
-The scheduled workflow is every three hours. GitHub Actions usage limits and provider quotas still apply.
+## Editorial standard
 
-## 7. Editorial and safety rules
-
-Videos must remain investigative documentaries, not fabricated horror stories. Use the curated evidence catalogue, distinguish documented facts from forecasts and what-if scenarios, disclose AI narration, and refuse to fill missing footage with unrelated clips. Hypothetical global outages or one-world-government scenarios must be identified as hypothetical. Monetization eligibility and revenue are controlled by each platform; this software cannot guarantee approval or earnings.
+Every episode must be a credible, solution-focused investigative documentary—not random horror fiction. Use verifiable evidence, realistic footage matched to the narration, clear uncertainty, strong narration, careful pacing, and practical solutions. Never invent statistics, reports, quotations, eyewitnesses, emergencies, or source URLs. Treat a worldwide blackout or one-world-government scenario as hypothetical unless real evidence supports a narrower claim. Environmental topics must reflect actual conditions and credible forecasts, not sensational claims.
