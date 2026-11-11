@@ -388,15 +388,15 @@ def validate_documentary_script(meta, expected_topic, fmt):
             f"Script topic drift: expected {expected_topic!r}, got {meta.get('topic')!r}"
         )
     narration = str(meta.get("narration", "")).strip()
-    words = re.findall(r"\\b[\\w’'-]+\\b", narration)
+    words = re.findall(r"\b[\w’'-]+\b", narration)
     if fmt == "short" and not 110 <= len(words) <= 160:
         raise ValueError(
             f"Short documentary narration must contain 110-160 words; got {len(words)}."
         )
     required_labels = {
-        "FACT": r"\\bFACT\\s*:",
-        "FORECAST": r"\\bFORECAST\\s*:",
-        "WHAT-IF": r"\\bWHAT[- ]IF\\s*:",
+        "FACT": r"\bFACT\s*:",
+        "FORECAST": r"\bFORECAST\s*:",
+        "WHAT-IF": r"\bWHAT[- ]IF\s*:",
     }
     missing = [label for label, pattern in required_labels.items()
                if not re.search(pattern, narration, flags=re.IGNORECASE)]
@@ -1043,7 +1043,7 @@ def main():
             "error": str(exc)[:900],
         })
         save_history(hist)
-        notify(f"❌ Video creation failed ({fmt}) at {stage}:\\n{traceback.format_exc()[-1500:]}")
+        notify(f"❌ Video creation failed ({fmt}) at {stage}:\n{traceback.format_exc()[-1500:]}")
         raise SystemExit(1)
 
     record = {
@@ -1181,7 +1181,7 @@ def main():
     )
     run_record["completed_at"] = dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
     save_history(hist)
-    notify(f"✅ New {fmt} documentary: {meta['title']}\\n" + "\\n".join(msgs))
+    notify(f"✅ New {fmt} documentary: {meta['title']}\n" + "\n".join(msgs))
 
     if NOW.hour == REPORT_HOUR:
         daily_report(hist)
