@@ -41,5 +41,17 @@
       "title": "What If Earth Crossed a Climate Tipping Point?"
     }
   ],
-  "patterns": {}
+  "patterns": {},
+  "runs": [
+    {
+      "time": "2026-11-11T06:52:04Z",
+      "format": "short",
+      "topic": "Water scarcity and drying rivers",
+      "status": "generation_failed",
+      "generated": false,
+      "platforms": {},
+      "failed_stage": "script and evidence validation",
+      "error": "Documentary narration must end with a thoughtful viewer question."
+    }
+  ]
 }
