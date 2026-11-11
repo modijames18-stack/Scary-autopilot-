@@ -37,6 +37,16 @@ class EvidenceLibraryTests(unittest.TestCase):
         )
         self.assertNotEqual(checked["sources"][0]["title"], "invented")
 
+    def test_source_verifier_keeps_curated_sources_when_sites_block_ci(self):
+        meta = {"topic": "AI and jobs", "sources": []}
+        with patch("autopilot.requests.get", side_effect=autopilot.requests.RequestException("blocked")):
+            checked = autopilot.verify_source_links(meta)
+        self.assertGreaterEqual(len(checked["sources"]), 2)
+        self.assertTrue(all(
+            source["url"].startswith("https://")
+            for source in checked["sources"]
+        ))
+
     def test_unknown_topic_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "Unknown or unsupported"):
             autopilot.verify_source_links({"topic": "a made-up topic"})
