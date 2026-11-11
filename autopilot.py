@@ -922,7 +922,7 @@ def main():
     elif not publishing_enabled("ENABLE_FACEBOOK_PUBLISH"):
         msgs.append("📘 Facebook skipped: publishing approval switch is off")
 
-    if publishing_enabled("ENABLE_INSTAGRAM_PUBLISH") and env("IG_USER_ID") and env("FB_PAGE_TOKEN"):
+    if publishing_enabled("ENABLE_INSTAGRAM_PUBLISH") and env("IG_USER_ID") and env("FB_PAGE_TOKEN") and fmt == "short":
         try:
             record["instagram_id"] = post_instagram_reel(video, meta, fmt)
             msgs.append(f"📸 Instagram: Reel published ({record['instagram_id']})")
@@ -930,6 +930,8 @@ def main():
             notify(f"❌ Instagram Reel publish failed: {str(e)[:700]}")
     elif not publishing_enabled("ENABLE_INSTAGRAM_PUBLISH"):
         msgs.append("📸 Instagram skipped: publishing approval switch is off")
+    elif fmt != "short":
+        msgs.append("📸 Instagram skipped: Reels require the vertical short format")
 
     if publishing_enabled("ENABLE_TIKTOK_UPLOAD") and env("TIKTOK_ACCESS_TOKEN") and fmt == "short":
         try:
