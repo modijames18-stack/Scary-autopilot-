@@ -13,10 +13,16 @@ TOPIC = "Water scarcity and drying rivers"
 
 def good_meta():
     narration = (
-        "FACT: " + "documented " * 40
-        + ". FORECAST: " + "credible " * 40
-        + ". WHAT-IF: " + "hypothetical " * 40
-        + ". What should communities do?"
+        "FACT: UN-Water reports that water scarcity is already affecting communities, farms and ecosystems, "
+        "while pressure varies sharply between river basins. The UNU-INWEH warns that overuse, pollution "
+        "and climate pressure can push some rivers and aquifers into severe stress. "
+        "FORECAST: If demand keeps rising and dry periods intensify, some regions may face harder competition "
+        "for drinking water, food production and healthy rivers; the scale depends on local management, "
+        "rainfall and investment. WHAT-IF: Imagine a basin where groundwater is pumped faster than rain can "
+        "replace it. Wells could fail, harvests could shrink and families might pay more, but this is a "
+        "scenario, not a claim about every river. Communities can conserve water, repair leaking pipes, "
+        "protect wetlands, monitor aquifers and plan fair sharing before a crisis grows. "
+        "Which action should leaders fund first?"
     )
     return {
         "topic": TOPIC,
@@ -56,6 +62,26 @@ class DocumentaryQualityTests(unittest.TestCase):
         meta = good_meta()
         meta["narration"] = meta["narration"].rstrip("?") + "."
         with self.assertRaisesRegex(ValueError, "viewer question"):
+            autopilot.validate_documentary_script(meta, TOPIC, "short")
+
+    def test_rejects_fictional_character_led_story(self):
+        meta = good_meta()
+        meta["narration"] = "One morning when Caleb heard a phone ring. " + meta["narration"]
+        with self.assertRaisesRegex(ValueError, "Fictional story framing"):
+            autopilot.validate_documentary_script(meta, TOPIC, "short")
+
+    def test_fact_section_requires_institutional_attribution(self):
+        meta = good_meta()
+        meta["narration"] = meta["narration"].replace("UN-Water reports", "Researchers report")
+        meta["narration"] = meta["narration"].replace("The UNU-INWEH warns", "Researchers warn")
+        with self.assertRaisesRegex(ValueError, "institution from the matching evidence catalogue"):
+            autopilot.validate_documentary_script(meta, TOPIC, "short")
+
+    def test_what_if_must_be_explicitly_hypothetical(self):
+        meta = good_meta()
+        meta["narration"] = meta["narration"].replace("Imagine a basin", "A basin")
+        meta["narration"] = meta["narration"].replace("this is a scenario", "this is a possibility")
+        with self.assertRaisesRegex(ValueError, "WHAT-IF section must explicitly identify"):
             autopilot.validate_documentary_script(meta, TOPIC, "short")
 
     def test_question_repair_adds_a_closing_question(self):
