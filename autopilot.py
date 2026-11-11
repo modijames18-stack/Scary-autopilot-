@@ -654,7 +654,7 @@ def post_instagram_reel(video, meta, fmt):
         raise RuntimeError("Instagram Reels publishing expects the vertical short video format")
     video_url = cloudinary_video_url(video)
     graph = f"https://graph.facebook.com/{env('META_GRAPH_VERSION', 'v24.0')}"
-    source_lines = "\\n".join(
+    source_lines = "\n".join(
         f"- {item.get('title', 'Source')}: {item.get('url', '')}"
         for item in meta.get("sources", []) if item.get("url")
     )
@@ -796,7 +796,7 @@ def daily_report(hist):
 
     if env("FB_PAGE_TOKEN"):
         try:
-            g = "https://graph.facebook.com/v21.0"
+            g = f"https://graph.facebook.com/{env('META_GRAPH_VERSION', 'v24.0')}"
             page, token = env("FB_PAGE_ID"), env("FB_PAGE_TOKEN")
             info = _fb_check(requests.get(f"{g}/{page}", params={
                 "fields": "fan_count,followers_count", "access_token": token}, timeout=30))
@@ -828,7 +828,8 @@ def pick_format():
     forced = env("FORCE_FORMAT").lower()
     if forced in ("short", "long"):
         return forced
-    # Every 3-hour run produces a vertical short so all four destinations can receive it.\n    return "short"
+    # Every 3-hour run produces a vertical short so all four destinations can receive it.
+    return "short"
 
 
 def main():
