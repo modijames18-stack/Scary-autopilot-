@@ -58,6 +58,29 @@ class DocumentaryQualityTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "viewer question"):
             autopilot.validate_documentary_script(meta, TOPIC, "short")
 
+    def test_question_repair_adds_a_closing_question(self):
+        meta = good_meta()
+        meta["narration"] = meta["narration"].rstrip("?") + "."
+        repaired = autopilot.ensure_viewer_question(meta, "short")
+        self.assertTrue(repaired["narration"].endswith("?"))
+        self.assertIn("FACT:", repaired["narration"])
+        self.assertIn("FORECAST:", repaired["narration"])
+        self.assertIn("WHAT-IF:", repaired["narration"])
+
+    def test_question_repair_preserves_existing_question(self):
+        meta = good_meta()
+        original = meta["narration"]
+        autopilot.ensure_viewer_question(meta, "short")
+        self.assertEqual(meta["narration"], original)
+
+    def test_question_repair_rejects_overlength_short_script(self):
+        meta = good_meta()
+        meta["narration"] = ("FACT: " + "evidence " * 55
+                             + "FORECAST: " + "risk " * 55
+                             + "WHAT-IF: " + "scenario " * 55)
+        with self.assertRaisesRegex(ValueError, "too long"):
+            autopilot.ensure_viewer_question(meta, "short")
+
 
 class RunHistoryTests(unittest.TestCase):
     def test_legacy_history_gets_a_runs_collection_and_persists_it(self):
