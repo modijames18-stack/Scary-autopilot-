@@ -1,13 +1,14 @@
 """
 Future-risk documentary autopilot.
 Every run: research current future-risk topics -> write an evidence-aware scenario -> AI voice -> build video
--> post to YouTube + Facebook Page -> Telegram alerts (+ daily performance report).
+-> publish to YouTube, Facebook, Instagram and TikTok inbox -> Telegram alerts (+ daily performance report).
 
-Runs on GitHub Actions every 3 hours. Mix of short and long videos.
+Runs on GitHub Actions every 3 hours. Each scheduled run creates one vertical short for all enabled platforms.
 """
 import asyncio
 import datetime as dt
 import json
+import hashlib
 import os
 import random
 import re
@@ -41,7 +42,7 @@ def publishing_enabled(variable):
 MODEL = env("CLAUDE_MODEL", "claude-sonnet-5-5")
 LONG_HOURS = [int(h) for h in env("LONG_HOURS", "6,18").split(",") if h.strip()]
 YT_PRIVACY = env("YOUTUBE_PRIVACY", "private")  # switch to "public" once Google approves your app
-YT_DAILY_CAP = int(env("YOUTUBE_DAILY_UPLOADS", "6"))  # default API quota allows ~6 uploads/day
+YT_DAILY_CAP = int(env("YOUTUBE_DAILY_UPLOADS", "8"))  # one upload per 3-hour run
 REPORT_HOUR = int(env("REPORT_HOUR_UTC", "21"))
 VOICE = env("TTS_VOICE", "en-US-ChristopherNeural")
 NOW = dt.datetime.utcnow()
@@ -594,7 +595,7 @@ def _fb_check(r):
 
 def post_facebook(video, meta, fmt):
     page, token = env("FB_PAGE_ID"), env("FB_PAGE_TOKEN")
-    g = "https://graph.facebook.com/v21.0"
+    g = f"https://graph.facebook.com/{env('META_GRAPH_VERSION', 'v24.0')}"
     source_lines = "\n".join(f"- {s.get('title', 'Source')}: {s.get('url', '')}" for s in meta.get('sources', []) if s.get('url'))
     desc = f"{meta['title']}\n\n{meta['description']}\n\n{hashtags(meta, fmt)}" + (f"\n\nSources:\n{source_lines}" if source_lines else "")
     if fmt == "short":  # Reel
@@ -615,6 +616,93 @@ def post_facebook(video, meta, fmt):
                                     data={"access_token": token, "title": meta["title"], "description": desc},
                                     files={"source": f}, timeout=3000))
     return j.get("id")
+
+
+
+def cloudinary_video_url(video):
+    """Upload a rendered video to Cloudinary so Instagram can fetch it by public HTTPS URL."""
+    cloud = env("CLOUDINARY_CLOUD_NAME")
+    api_key = env("CLOUDINARY_API_KEY")
+    api_secret = env("CLOUDINARY_API_SECRET")
+    if not all((cloud, api_key, api_secret)):
+        raise RuntimeError("Instagram requires CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET")
+    timestamp = int(time.time())
+    params = {"folder": "scary-autopilot", "timestamp": timestamp}
+    signed = "&".join(f"{key}={params[key]}" for key in sorted(params)) + api_secret
+    signature = hashlib.sha1(signed.encode("utf-8")).hexdigest()
+    with open(video, "rb") as stream:
+        response = requests.post(
+            f"https://api.cloudinary.com/v1_1/{cloud}/video/upload",
+            data={**params, "api_key": api_key, "signature": signature},
+            files={"file": stream},
+            timeout=1800,
+        )
+    if not response.ok:
+        raise RuntimeError(f"Cloudinary video hosting failed {response.status_code}: {response.text[:500]}")
+    secure_url = response.json().get("secure_url", "")
+    if not secure_url.startswith("https://"):
+        raise RuntimeError("Cloudinary did not return a public HTTPS video URL")
+    return secure_url
+
+
+def post_instagram_reel(video, meta, fmt):
+    """Publish a Reel to a linked Instagram professional account via Meta Graph API."""
+    ig_user_id, token = env("IG_USER_ID"), env("FB_PAGE_TOKEN")
+    if not ig_user_id or not token:
+        raise RuntimeError("Instagram requires IG_USER_ID and FB_PAGE_TOKEN")
+    if fmt != "short":
+        raise RuntimeError("Instagram Reels publishing expects the vertical short video format")
+    video_url = cloudinary_video_url(video)
+    graph = f"https://graph.facebook.com/{env('META_GRAPH_VERSION', 'v24.0')}"
+    source_lines = "\\n".join(
+        f"- {item.get('title', 'Source')}: {item.get('url', '')}"
+        for item in meta.get("sources", []) if item.get("url")
+    )
+    caption = f"{meta['title']}\\n\\n{meta['description']}\\n\\n{hashtags(meta, fmt)}"
+    if source_lines:
+        caption += f"\\n\\nSources:\\n{source_lines}"
+    caption = caption[:2200]
+
+    created = _fb_check(requests.post(
+        f"{graph}/{ig_user_id}/media",
+        data={
+            "media_type": "REELS",
+            "video_url": video_url,
+            "caption": caption,
+            "share_to_feed": "true",
+            "access_token": token,
+        },
+        timeout=180,
+    ))
+    container_id = created.get("id")
+    if not container_id:
+        raise RuntimeError("Instagram did not return a Reel container ID")
+
+    # Meta processes the hosted video asynchronously. Publish only after FINISHED.
+    for attempt in range(36):
+        status = _fb_check(requests.get(
+            f"{graph}/{container_id}",
+            params={"fields": "status_code,status", "access_token": token},
+            timeout=60,
+        ))
+        code = status.get("status_code")
+        if code == "FINISHED":
+            break
+        if code in ("ERROR", "EXPIRED"):
+            raise RuntimeError(f"Instagram Reel processing {code}: {status.get('status', '')}")
+        time.sleep(10)
+    else:
+        raise RuntimeError("Instagram Reel processing did not finish within six minutes")
+
+    published = _fb_check(requests.post(
+        f"{graph}/{ig_user_id}/media_publish",
+        data={"creation_id": container_id, "access_token": token},
+        timeout=180,
+    ))
+    media_id = published.get("id")
+    if not media_id:
+        raise RuntimeError("Instagram did not return a published media ID")
+    return media_id
 
 
 def post_tiktok_inbox(video, meta):
@@ -723,6 +811,11 @@ def daily_report(hist):
         except Exception as e:
             lines.append(f"Facebook report failed: {str(e)[:150]}")
 
+    if env("IG_USER_ID") and env("FB_PAGE_TOKEN") and publishing_enabled("ENABLE_INSTAGRAM_PUBLISH"):
+        lines.append("\n📸 Instagram: Reels publishing configured")
+    else:
+        lines.append("\n📸 Instagram: not connected or publishing switch is off")
+
     if env("TIKTOK_ACCESS_TOKEN") and publishing_enabled("ENABLE_TIKTOK_UPLOAD"):
         lines.append("\n🎵 TikTok: inbox upload configured (creator completes publishing in the app)")
     else:
@@ -735,7 +828,7 @@ def pick_format():
     forced = env("FORCE_FORMAT").lower()
     if forced in ("short", "long"):
         return forced
-    return "long" if NOW.hour in LONG_HOURS else "short"
+    # Every 3-hour run produces a vertical short so all four destinations can receive it.\n    return "short"
 
 
 def main():
@@ -782,6 +875,15 @@ def main():
             notify(f"❌ Facebook post failed: {str(e)[:700]}")
     elif not publishing_enabled("ENABLE_FACEBOOK_PUBLISH"):
         msgs.append("📘 Facebook skipped: publishing approval switch is off")
+
+    if publishing_enabled("ENABLE_INSTAGRAM_PUBLISH") and env("IG_USER_ID") and env("FB_PAGE_TOKEN"):
+        try:
+            record["instagram_id"] = post_instagram_reel(video, meta, fmt)
+            msgs.append(f"📸 Instagram: Reel published ({record['instagram_id']})")
+        except Exception as e:
+            notify(f"❌ Instagram Reel publish failed: {str(e)[:700]}")
+    elif not publishing_enabled("ENABLE_INSTAGRAM_PUBLISH"):
+        msgs.append("📸 Instagram skipped: publishing approval switch is off")
 
     if publishing_enabled("ENABLE_TIKTOK_UPLOAD") and env("TIKTOK_ACCESS_TOKEN") and fmt == "short":
         try:
