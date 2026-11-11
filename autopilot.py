@@ -67,12 +67,21 @@ def notify(text):
 
 def load_history():
     if HISTORY_FILE.exists():
-        return json.loads(HISTORY_FILE.read_text())
-    return {"posts": [], "patterns": {}}
+        history = json.loads(HISTORY_FILE.read_text())
+    else:
+        history = {}
+    history.setdefault("posts", [])
+    history.setdefault("patterns", {})
+    history.setdefault("runs", [])
+    return history
 
 
 def save_history(h):
+    h.setdefault("posts", [])
+    h.setdefault("patterns", {})
+    h.setdefault("runs", [])
     h["posts"] = h["posts"][-500:]
+    h["runs"] = h["runs"][-500:]
     HISTORY_FILE.write_text(json.dumps(h, indent=2))
 
 
@@ -268,8 +277,10 @@ Investigative documentary rules (mandatory):
   fake emergency broadcast, fictional town, or fabricated eyewitness.
 - Build a clear investigation: what is happening now; what reliable evidence shows; what experts
   disagree about; what could plausibly happen next; who would be affected; and what solutions exist.
-- Label statements clearly in the narration as FACT, FORECAST, or WHAT-IF when the distinction matters.
-  A hypothetical scenario must be explicitly described as hypothetical.
+- The narration MUST use three clearly separated spoken labels: "FACT:", "FORECAST:", and "WHAT-IF:".
+  FACT contains only documented evidence from the matching catalogue topic. FORECAST describes a
+  credible, qualified future risk and its uncertainty. WHAT-IF is explicitly hypothetical and must
+  never be presented as an event that has happened or a prediction that is certain.
 - Use specific, checkable evidence. Never invent statistics, studies, report titles, quotations,
   experts, dates, or source URLs. If a precise claim cannot be supported, omit it or qualify it.
 - Ground factual statements in the supplied evidence catalogue. Do not invent statistics, study findings, source titles, or URLs. Keep forecasts and what-if scenarios clearly separate from documented facts.
@@ -298,7 +309,9 @@ Reply with ONLY a JSON object with these keys:
         "Be compelling, evidence-aware, balanced, and solution-focused.",
         prompt, max_tokens=1200 if fmt == "short" else 5000, json_mode=True,
     )
-    meta = verify_source_links(parse_meta(raw))
+    meta = validate_documentary_script(
+        verify_source_links(parse_meta(raw)), expected_topic=topic, fmt=fmt
+    )
 
     if fmt == "short":
         try:
@@ -311,7 +324,9 @@ Reply with ONLY a JSON object with these keys:
                 "Reply with ONLY the same JSON object (same keys).\n\n" + json.dumps(meta),
                 max_tokens=1200, json_mode=True,
             )
-            meta = verify_source_links(parse_meta(better))
+            meta = validate_documentary_script(
+                verify_source_links(parse_meta(better)), expected_topic=topic, fmt=fmt
+            )
         except Exception as e:
             print("Polish pass skipped:", e)
     meta["visual_scenes"] = make_visual_plan(meta["narration"])
@@ -363,6 +378,41 @@ def parse_meta(raw):
         raise ValueError("Script sources must be a list")
     if not isinstance(meta["visual_keywords"], list) or len(meta["visual_keywords"]) < 4:
         raise ValueError("Script must include at least four documentary footage search phrases")
+    return meta
+
+
+def validate_documentary_script(meta, expected_topic, fmt):
+    """Deterministic editorial gate: reject topic drift and unlabeled/underlength scripts."""
+    if meta.get("topic") != expected_topic:
+        raise ValueError(
+            f"Script topic drift: expected {expected_topic!r}, got {meta.get('topic')!r}"
+        )
+    narration = str(meta.get("narration", "")).strip()
+    words = re.findall(r"\\b[\\w’'-]+\\b", narration)
+    if fmt == "short" and not 110 <= len(words) <= 160:
+        raise ValueError(
+            f"Short documentary narration must contain 110-160 words; got {len(words)}."
+        )
+    required_labels = {
+        "FACT": r"\\bFACT\\s*:",
+        "FORECAST": r"\\bFORECAST\\s*:",
+        "WHAT-IF": r"\\bWHAT[- ]IF\\s*:",
+    }
+    missing = [label for label, pattern in required_labels.items()
+               if not re.search(pattern, narration, flags=re.IGNORECASE)]
+    if missing:
+        raise ValueError(
+            "Documentary narration must clearly separate FACT, FORECAST, and WHAT-IF; "
+            f"missing labels: {', '.join(missing)}."
+        )
+    if not re.search(r"\\?\\s*[\\"'”’)]*\\s*$", narration):
+        raise ValueError("Documentary narration must end with a thoughtful viewer question.")
+    if len(meta.get("sources", [])) < 2:
+        raise ValueError("Documentary must cite at least two curated institutional sources.")
+    if not str(meta.get("title", "")).strip() or len(str(meta["title"])) >= 85:
+        raise ValueError("Documentary title must be 1-84 characters.")
+    if not str(meta.get("description", "")).strip():
+        raise ValueError("Documentary description is required.")
     return meta
 
 
@@ -793,6 +843,65 @@ def post_tiktok_inbox(video, meta):
     return publish_id
 
 
+def verify_youtube_upload(video_id):
+    """Read the uploaded video back from YouTube and confirm its actual privacy status."""
+    from googleapiclient.discovery import build
+    yt = build("youtube", "v3", credentials=yt_credentials(), cache_discovery=False)
+    items = yt.videos().list(part="status,snippet", id=video_id).execute().get("items", [])
+    if not items or items[0].get("id") != video_id:
+        raise RuntimeError("YouTube upload ID could not be independently read back.")
+    privacy = items[0].get("status", {}).get("privacyStatus")
+    if privacy != YT_PRIVACY:
+        raise RuntimeError(
+            f"YouTube privacy verification mismatch: expected {YT_PRIVACY!r}, got {privacy!r}."
+        )
+    return {"privacy_status": privacy, "title": items[0].get("snippet", {}).get("title", "")}
+
+
+def verify_facebook_reel(video_id):
+    """Read the Page video object back after the Reel publish operation."""
+    token = env("FB_PAGE_TOKEN")
+    graph = f"https://graph.facebook.com/{env('META_GRAPH_VERSION', 'v24.0')}"
+    data = _fb_check(requests.get(
+        f"{graph}/{video_id}",
+        params={"fields": "id,permalink_url", "access_token": token},
+        timeout=60,
+    ))
+    if str(data.get("id", "")) != str(video_id):
+        raise RuntimeError("Facebook Reel ID could not be independently verified.")
+    return {"permalink": data.get("permalink_url", "")}
+
+
+def verify_instagram_reel(media_id):
+    """Read the published Instagram media object back and confirm its video/Reel identity."""
+    token = env("FB_PAGE_TOKEN")
+    graph = f"https://graph.facebook.com/{env('META_GRAPH_VERSION', 'v24.0')}"
+    data = _fb_check(requests.get(
+        f"{graph}/{media_id}",
+        params={
+            "fields": "id,media_type,media_product_type,permalink,timestamp",
+            "access_token": token,
+        },
+        timeout=60,
+    ))
+    if str(data.get("id", "")) != str(media_id):
+        raise RuntimeError("Instagram media ID could not be independently verified.")
+    if data.get("media_type") not in ("VIDEO", "REELS"):
+        raise RuntimeError(
+            f"Instagram media is not a video/Reel: {data.get('media_type')!r}."
+        )
+    product_type = data.get("media_product_type")
+    if product_type and product_type != "REELS":
+        raise RuntimeError(
+            f"Instagram media product type is not REELS: {product_type!r}."
+        )
+    return {
+        "media_type": data.get("media_type"),
+        "media_product_type": product_type or "not returned by API",
+        "permalink": data.get("permalink", ""),
+    }
+
+
 # TikTok inbox upload uses video.upload; the creator must finish publishing in TikTok.
 
 
@@ -800,12 +909,15 @@ def post_tiktok_inbox(video, meta):
 def daily_report(hist):
     posts_today = [p for p in hist["posts"] if p["time"][:10] == TODAY]
     s = sum(1 for p in posts_today if p["format"] == "short")
-    youtube_count = sum(1 for p in posts_today if p.get("youtube_id"))
-    facebook_count = sum(1 for p in posts_today if p.get("facebook_id"))
-    instagram_count = sum(1 for p in posts_today if p.get("instagram_id"))
+    youtube_count = sum(1 for p in posts_today if p.get("youtube_verified"))
+    facebook_count = sum(1 for p in posts_today if p.get("facebook_verified"))
+    instagram_count = sum(1 for p in posts_today if p.get("instagram_verified"))
     tiktok_count = sum(1 for p in posts_today if p.get("tiktok_inbox_id"))
+    runs_today = [r for r in hist.get("runs", []) if str(r.get("time", "")).startswith(TODAY)]
+    failed_runs = sum(1 for r in runs_today if r.get("status") == "generation_failed")
     lines = [
         f"📊 Daily report {TODAY}",
+        f"Scheduled attempts recorded: {len(runs_today)}; generation failures: {failed_runs}",
         f"Videos generated: {len(posts_today)} ({s} short, {len(posts_today) - s} long)",
         f"Platform deliveries: YouTube {youtube_count}; Facebook {facebook_count}; "
         f"Instagram {instagram_count}; TikTok inbox {tiktok_count}",
@@ -884,69 +996,192 @@ def main():
 
     fmt = pick_format()
     topic = choose_topic(hist)
+    run_record = {
+        "time": NOW.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "format": fmt,
+        "topic": topic,
+        "status": "started",
+        "generated": False,
+        "platforms": {},
+    }
+    hist.setdefault("runs", []).append(run_record)
+    save_history(hist)
+
+    stage = "audience research"
     try:
         try:
             patterns = research(fmt, hist)
         except Exception as e:
             print("Research failed:", e)
             patterns = "(audience research unavailable; use established evidence, primary sources, balanced uncertainty, and an investigative documentary structure; do not invent events or claims)"
+
+        stage = "script and evidence validation"
         meta = write_script(fmt, patterns, hist, topic=topic)
-        duration = make_voice_and_captions(fmt, meta["narration"])
-        video = build_video(fmt, meta, duration)
-    except Exception:
-        notify(f"❌ Video creation failed ({fmt}):\n{traceback.format_exc()[-1500:]}")
+        run_record.update({
+            "title": meta["title"],
+            "source_count": len(meta.get("sources", [])),
+            "visual_scene_count": len(meta.get("visual_scenes", [])),
+        })
         save_history(hist)
+
+        stage = "narration and captions"
+        duration = make_voice_and_captions(fmt, meta["narration"])
+
+        stage = "scene footage and rendering"
+        video = build_video(fmt, meta, duration)
+        run_record.update({
+            "generated": True,
+            "status": "generated",
+            "video_file": video.name,
+            "duration_seconds": round(duration, 2),
+        })
+        save_history(hist)
+    except Exception as exc:
+        run_record.update({
+            "status": "generation_failed",
+            "failed_stage": stage,
+            "error": str(exc)[:900],
+        })
+        save_history(hist)
+        notify(f"❌ Video creation failed ({fmt}) at {stage}:\\n{traceback.format_exc()[-1500:]}")
         raise SystemExit(1)
 
-    record = {"time": NOW.strftime("%Y-%m-%dT%H:%M:%SZ"), "format": fmt, "title": meta["title"], "topic": meta["topic"]}
+    record = {
+        "time": NOW.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "format": fmt,
+        "title": meta["title"],
+        "topic": meta["topic"],
+    }
     msgs = []
 
+    def platform_result(name, status, **details):
+        run_record["platforms"][name] = {"status": status, **details}
+        save_history(hist)
+
     yt_today = sum(1 for p in hist["posts"] if p.get("youtube_id") and p["time"][:10] == TODAY)
-    if publishing_enabled("ENABLE_YOUTUBE_UPLOAD") and env("YT_REFRESH_TOKEN") and yt_today < YT_DAILY_CAP:
-        try:
-            record["youtube_id"] = post_youtube(video, meta, fmt)
-            msgs.append(f"▶️ YouTube ({YT_PRIVACY}): https://youtu.be/{record['youtube_id']}")
-        except Exception as e:
-            notify(f"❌ YouTube upload failed: {str(e)[:700]}")
-    elif not publishing_enabled("ENABLE_YOUTUBE_UPLOAD"):
-        msgs.append("▶️ YouTube skipped: upload approval switch is off")
-    elif env("YT_REFRESH_TOKEN"):
+    if not publishing_enabled("ENABLE_YOUTUBE_UPLOAD"):
+        platform_result("youtube", "skipped", reason="upload switch is off")
+        msgs.append("▶️ YouTube skipped: upload switch is off")
+    elif not all(env(k) for k in ("YT_CLIENT_ID", "YT_CLIENT_SECRET", "YT_REFRESH_TOKEN")):
+        platform_result("youtube", "blocked", reason="YouTube OAuth credentials are incomplete")
+        msgs.append("▶️ YouTube blocked: OAuth credentials are incomplete")
+    elif yt_today >= YT_DAILY_CAP:
+        platform_result("youtube", "skipped", reason="daily upload cap reached")
         msgs.append("▶️ YouTube skipped: daily upload cap reached")
-
-    if publishing_enabled("ENABLE_FACEBOOK_PUBLISH") and env("FB_PAGE_TOKEN") and env("FB_PAGE_ID"):
+    else:
         try:
-            record["facebook_id"] = post_facebook(video, meta, fmt)
-            msgs.append(f"📘 Facebook: posted ({record['facebook_id']})")
+            video_id = post_youtube(video, meta, fmt)
+            record["youtube_id"] = video_id
+            try:
+                verified = verify_youtube_upload(video_id)
+                record["youtube_verified"] = True
+                record["youtube_privacy"] = verified["privacy_status"]
+                platform_result(
+                    "youtube", "verified_upload", id=video_id,
+                    privacy_status=verified["privacy_status"],
+                )
+                msgs.append(f"▶️ YouTube verified ({verified['privacy_status']}): https://youtu.be/{video_id}")
+            except Exception as verify_error:
+                platform_result("youtube", "uploaded_unverified", id=video_id,
+                                error=str(verify_error)[:400])
+                msgs.append(f"▶️ YouTube upload returned ID {video_id}, but read-back verification failed")
         except Exception as e:
+            platform_result("youtube", "failed", error=str(e)[:500])
+            notify(f"❌ YouTube upload failed: {str(e)[:700]}")
+
+    if not publishing_enabled("ENABLE_FACEBOOK_PUBLISH"):
+        platform_result("facebook", "skipped", reason="publishing switch is off")
+        msgs.append("📘 Facebook skipped: publishing switch is off")
+    elif not all(env(k) for k in ("FB_PAGE_ID", "FB_PAGE_TOKEN")):
+        platform_result("facebook", "blocked", reason="Page ID or Page token is missing")
+        msgs.append("📘 Facebook blocked: Page credentials are incomplete")
+    else:
+        try:
+            video_id = post_facebook(video, meta, fmt)
+            record["facebook_id"] = video_id
+            try:
+                verified = verify_facebook_reel(video_id)
+                record["facebook_verified"] = True
+                record["facebook_permalink"] = verified.get("permalink", "")
+                platform_result("facebook", "verified_publish", id=video_id,
+                                permalink=verified.get("permalink", ""))
+                msgs.append(f"📘 Facebook Reel verified ({video_id})")
+            except Exception as verify_error:
+                platform_result("facebook", "published_unverified", id=video_id,
+                                error=str(verify_error)[:400])
+                msgs.append(f"📘 Facebook returned ID {video_id}, but read-back verification failed")
+        except Exception as e:
+            platform_result("facebook", "failed", error=str(e)[:500])
             notify(f"❌ Facebook post failed: {str(e)[:700]}")
-    elif not publishing_enabled("ENABLE_FACEBOOK_PUBLISH"):
-        msgs.append("📘 Facebook skipped: publishing approval switch is off")
 
-    if publishing_enabled("ENABLE_INSTAGRAM_PUBLISH") and env("IG_USER_ID") and env("FB_PAGE_TOKEN") and fmt == "short":
-        try:
-            record["instagram_id"] = post_instagram_reel(video, meta, fmt)
-            msgs.append(f"📸 Instagram: Reel published ({record['instagram_id']})")
-        except Exception as e:
-            notify(f"❌ Instagram Reel publish failed: {str(e)[:700]}")
-    elif not publishing_enabled("ENABLE_INSTAGRAM_PUBLISH"):
-        msgs.append("📸 Instagram skipped: publishing approval switch is off")
+    if not publishing_enabled("ENABLE_INSTAGRAM_PUBLISH"):
+        platform_result("instagram", "skipped", reason="publishing switch is off")
+        msgs.append("📸 Instagram skipped: publishing switch is off")
     elif fmt != "short":
+        platform_result("instagram", "skipped", reason="Reels require the vertical short format")
         msgs.append("📸 Instagram skipped: Reels require the vertical short format")
-
-    if publishing_enabled("ENABLE_TIKTOK_UPLOAD") and env("TIKTOK_ACCESS_TOKEN") and fmt == "short":
+    elif not all(env(k) for k in (
+        "IG_USER_ID", "FB_PAGE_TOKEN", "CLOUDINARY_CLOUD_NAME",
+        "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET",
+    )):
+        platform_result("instagram", "blocked", reason="Meta or Cloudinary configuration is incomplete")
+        msgs.append("📸 Instagram blocked: Meta or Cloudinary configuration is incomplete")
+    else:
         try:
-            record["tiktok_inbox_id"] = post_tiktok_inbox(video, meta)
-            msgs.append("🎵 TikTok: video uploaded to inbox; open TikTok notifications to review and publish")
+            media_id = post_instagram_reel(video, meta, fmt)
+            record["instagram_id"] = media_id
+            try:
+                verified = verify_instagram_reel(media_id)
+                record["instagram_verified"] = True
+                record["instagram_permalink"] = verified.get("permalink", "")
+                platform_result(
+                    "instagram", "verified_publish", id=media_id,
+                    media_type=verified.get("media_type"),
+                    media_product_type=verified.get("media_product_type"),
+                    permalink=verified.get("permalink", ""),
+                )
+                msgs.append(f"📸 Instagram Reel verified ({media_id})")
+            except Exception as verify_error:
+                platform_result("instagram", "published_unverified", id=media_id,
+                                error=str(verify_error)[:400])
+                msgs.append(f"📸 Instagram returned ID {media_id}, but read-back verification failed")
         except Exception as e:
-            notify(f"❌ TikTok inbox upload failed: {str(e)[:700]}")
-    elif not publishing_enabled("ENABLE_TIKTOK_UPLOAD"):
-        msgs.append("🎵 TikTok skipped: upload approval switch is off")
+            platform_result("instagram", "failed", error=str(e)[:500])
+            notify(f"❌ Instagram Reel publish failed: {str(e)[:700]}")
+
+    if not publishing_enabled("ENABLE_TIKTOK_UPLOAD"):
+        platform_result("tiktok", "skipped", reason="inbox upload switch is off")
+        msgs.append("🎵 TikTok skipped: inbox upload switch is off")
     elif fmt != "short":
+        platform_result("tiktok", "skipped", reason="only vertical short videos are sent to the inbox")
         msgs.append("🎵 TikTok skipped: only short-format videos are sent to the inbox")
+    elif not env("TIKTOK_ACCESS_TOKEN"):
+        platform_result("tiktok", "blocked", reason="TikTok access token is missing")
+        msgs.append("🎵 TikTok blocked: access token is missing")
+    else:
+        try:
+            publish_id = post_tiktok_inbox(video, meta)
+            record["tiktok_inbox_id"] = publish_id
+            platform_result(
+                "tiktok", "inbox_uploaded", id=publish_id,
+                note="Draft delivered to the TikTok inbox; creator must review and publish.",
+            )
+            msgs.append("🎵 TikTok inbox upload confirmed; creator must finish publishing in the app")
+        except Exception as e:
+            platform_result("tiktok", "failed", error=str(e)[:500])
+            notify(f"❌ TikTok inbox upload failed: {str(e)[:700]}")
 
     hist["posts"].append(record)
+    delivery_states = [item.get("status") for item in run_record["platforms"].values()]
+    run_record["status"] = (
+        "completed_with_delivery_issues"
+        if any(state in ("failed", "blocked", "uploaded_unverified", "published_unverified")
+               for state in delivery_states)
+        else "completed"
+    )
+    run_record["completed_at"] = dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
     save_history(hist)
-    notify(f"✅ New {fmt} video: {meta['title']}\n" + "\n".join(msgs))
+    notify(f"✅ New {fmt} documentary: {meta['title']}\\n" + "\\n".join(msgs))
 
     if NOW.hour == REPORT_HOUR:
         daily_report(hist)
