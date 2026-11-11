@@ -34,6 +34,30 @@ def env(name, default=""):
     return v or default
 
 
+def github_run_context():
+    """Attach non-secret GitHub Actions identifiers to the persisted run record."""
+    return {
+        "github_run_id": env("GITHUB_RUN_ID") or None,
+        "github_run_attempt": env("GITHUB_RUN_ATTEMPT") or None,
+        "github_event": env("GITHUB_EVENT_NAME") or "local",
+    }
+
+
+def delivery_completion_status(platforms):
+    """Only mark the run fully delivered when all four configured handoffs are verified."""
+    expected = {
+        "youtube": "verified_upload",
+        "facebook": "verified_publish",
+        "instagram": "verified_publish",
+        # TikTok's permitted video.upload integration is an inbox handoff, not a public post.
+        "tiktok": "inbox_uploaded",
+    }
+    if all(platforms.get(name, {}).get("status") == status
+           for name, status in expected.items()):
+        return "completed"
+    return "completed_with_delivery_issues"
+
+
 def publishing_enabled(variable):
     """Publishing is opt-in; missing or non-true switches always disable uploads."""
     return env(variable).lower() == "true"
@@ -1200,6 +1224,7 @@ def main():
     topic = choose_topic(hist)
     run_record = {
         "time": NOW.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        **github_run_context(),
         "format": fmt,
         "topic": topic,
         "status": "started",
@@ -1374,13 +1399,7 @@ def main():
             notify(f"❌ TikTok inbox upload failed: {str(e)[:700]}")
 
     hist["posts"].append(record)
-    delivery_states = [item.get("status") for item in run_record["platforms"].values()]
-    run_record["status"] = (
-        "completed_with_delivery_issues"
-        if any(state in ("failed", "blocked", "uploaded_unverified", "published_unverified")
-               for state in delivery_states)
-        else "completed"
-    )
+    run_record["status"] = delivery_completion_status(run_record["platforms"])
     run_record["completed_at"] = dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
     save_history(hist)
     notify(f"✅ New {fmt} documentary: {meta['title']}\n" + "\n".join(msgs))
