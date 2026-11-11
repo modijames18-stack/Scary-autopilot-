@@ -658,9 +658,9 @@ def post_instagram_reel(video, meta, fmt):
         f"- {item.get('title', 'Source')}: {item.get('url', '')}"
         for item in meta.get("sources", []) if item.get("url")
     )
-    caption = f"{meta['title']}\\n\\n{meta['description']}\\n\\n{hashtags(meta, fmt)}"
+    caption = f"{meta['title']}\n\n{meta['description']}\n\n{hashtags(meta, fmt)}"
     if source_lines:
-        caption += f"\\n\\nSources:\\n{source_lines}"
+        caption += f"\n\nSources:\n{source_lines}"
     caption = caption[:2200]
 
     created = _fb_check(requests.post(
