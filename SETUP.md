@@ -61,7 +61,7 @@ Official docs: [TikTok Content Posting API — Get Started](https://developers.t
 - Facebook requires a Page access token with the relevant Page video publishing permissions. Personal-profile publishing is not supported by this integration.
 - Meta and Google may require app review, verification, or account eligibility. A successful code deployment does not grant those permissions.
 
-## 5. Run and review
+## 5. Configuration preflight\n\nEvery scheduled run checks that an AI provider and at least one stock-footage provider are configured. If a platform switch is enabled but its required credentials are missing, the run stops before creating a video and reports exactly which credential names are missing (never their values). Platforms left disabled are clearly reported as disabled. This prevents silent skipped publishing.\n\n## 6. Run and review
 
 1. Open the repository's **Actions** tab.
 2. Select **Autopilot** → **Run workflow**.
@@ -71,6 +71,6 @@ Official docs: [TikTok Content Posting API — Get Started](https://developers.t
 
 The scheduled workflow is every three hours. GitHub Actions usage limits and provider quotas still apply.
 
-## Editorial and safety rules
+## 7. Editorial and safety rules
 
 Videos must remain investigative documentaries, not fabricated horror stories. Use the curated evidence catalogue, distinguish documented facts from forecasts and what-if scenarios, disclose AI narration, and refuse to fill missing footage with unrelated clips. Hypothetical global outages or one-world-government scenarios must be identified as hypothetical. Monetization eligibility and revenue are controlled by each platform; this software cannot guarantee approval or earnings.
