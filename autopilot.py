@@ -699,7 +699,10 @@ def daily_report(hist):
         except Exception as e:
             lines.append(f"Facebook report failed: {str(e)[:150]}")
 
-    lines.append("\n🎵 TikTok: not connected yet")
+    if env("TIKTOK_ACCESS_TOKEN") and publishing_enabled("ENABLE_TIKTOK_UPLOAD"):
+        lines.append("\n🎵 TikTok: inbox upload configured (creator completes publishing in the app)")
+    else:
+        lines.append("\n🎵 TikTok: not connected or upload switch is off")
     notify("\n".join(lines))
 
 
