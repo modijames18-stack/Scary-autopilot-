@@ -214,7 +214,101 @@ TOPIC_ROTATION = [
     "Air pollution and health",
     "Internet infrastructure and global connectivity",
     "Red or discolored rivers and harmful algal blooms",
+
 ]
+
+# Topic-specific editorial profiles are deterministic guardrails, not a substitute
+# for human review of nuanced factual claims.
+TOPIC_FACT_ATTRIBUTIONS = {
+    "Water scarcity and drying rivers": (
+        r"\bUN[- ]Water\b", r"\bUNU[- ]INWEH\b", r"\bUnited Nations University\b",
+    ),
+    "AI and jobs": (r"\bILO\b", r"\bInternational Labour Organization\b"),
+    "Global AI governance and concentration of power": (
+        r"\bUnited Nations\b", r"\bUN Global Risk Report\b", r"\bUN (?:scientific )?panel\b",
+    ),
+    "Power-grid resilience and worldwide blackout scenarios": (
+        r"\bIEA\b", r"\bInternational Energy Agency\b",
+    ),
+    "Internet infrastructure and global connectivity": (
+        r"\bITU\b", r"\bInternational Telecommunication Union\b",
+    ),
+    "Climate change, extreme weather and food security": (
+        r"\bIPCC\b", r"\bIntergovernmental Panel on Climate Change\b",
+    ),
+    "Ocean warming, sea-level rise and glacier loss": (
+        r"\bWMO\b", r"\bWorld Meteorological Organization\b",
+    ),
+    "Air pollution and health": (r"\bWHO\b", r"\bWorld Health Organization\b"),
+    "Red or discolored rivers and harmful algal blooms": (
+        r"\bNOAA\b", r"\bEPA\b", r"\bEnvironmental Protection Agency\b",
+    ),
+}
+
+TOPIC_FACT_TERMS = {
+    "Water scarcity and drying rivers": r"\b(?:water|river|scarcity|drought|aquifer|groundwater|basin)\b",
+    "AI and jobs": r"\b(?:AI|artificial intelligence|generative AI|jobs?|employment|workplace)\b",
+    "Global AI governance and concentration of power": r"\b(?:AI|artificial intelligence|governance|concentration of power|global risk)\b",
+    "Power-grid resilience and worldwide blackout scenarios": r"\b(?:power|electricity|grid|energy|outage|resilience)\b",
+    "Internet infrastructure and global connectivity": r"\b(?:internet|submarine cable|cable|connectivity|network)\b",
+    "Climate change, extreme weather and food security": r"\b(?:climate|heat|drought|flood|extreme weather|food security)\b",
+    "Ocean warming, sea-level rise and glacier loss": r"\b(?:ocean|sea level|glacier|marine|ocean heat|warming)\b",
+    "Air pollution and health": r"\b(?:air pollution|pollution|particulate|smog|air quality)\b",
+    "Red or discolored rivers and harmful algal blooms": r"\b(?:river|algal|bloom|cyanobacteria|water|discoloration)\b",
+}
+
+TOPIC_VISUAL_TERMS = {
+    "Water scarcity and drying rivers": {
+        "water", "river", "drought", "dry", "drying", "reservoir", "groundwater",
+        "aquifer", "basin", "irrigation", "scarcity", "well", "wetland", "farmer",
+        "farmers", "crop", "crops", "pipe", "rain",
+    },
+    "AI and jobs": {
+        "ai", "artificial", "intelligence", "automation", "worker", "workers", "job",
+        "jobs", "employment", "workplace", "robot", "robots", "office", "factory",
+        "factories", "training", "skills",
+    },
+    "Global AI governance and concentration of power": {
+        "ai", "artificial", "intelligence", "governance", "regulation", "policy",
+        "power", "technology", "algorithm", "algorithms", "data", "computing",
+    },
+    "Power-grid resilience and worldwide blackout scenarios": {
+        "power", "electricity", "grid", "blackout", "energy", "transmission",
+        "substation", "transformer", "solar", "wind", "outage", "utility", "utilities",
+    },
+    "Internet infrastructure and global connectivity": {
+        "internet", "submarine", "cable", "cables", "fibre", "fiber", "network",
+        "data", "satellite", "connectivity", "telecom", "server", "repair", "ship",
+    },
+    "Climate change, extreme weather and food security": {
+        "climate", "heat", "weather", "drought", "flood", "storm", "food", "crop",
+        "farm", "farming", "precipitation", "extreme", "emissions", "wildfire",
+    },
+    "Ocean warming, sea-level rise and glacier loss": {
+        "ocean", "sea", "glacier", "ice", "coast", "coastal", "warming", "coral",
+        "marine", "water", "heat", "sea-level",
+    },
+    "Air pollution and health": {
+        "air", "pollution", "particulate", "smog", "emissions", "health", "lungs",
+        "vehicle", "factory", "monitor", "air-quality",
+    },
+    "Red or discolored rivers and harmful algal blooms": {
+        "river", "algae", "algal", "bloom", "water", "discolored", "red",
+        "cyanobacteria", "nutrient", "runoff", "lake", "sample", "testing",
+    },
+}
+
+BANNED_VISUAL_PATTERN = re.compile(
+    r"\b(?:haunted|ghost|phantom|monster|demon|horror|creepy|blood|"
+    r"dark hallway|dark corridor|black forest|abandoned house|abandoned hallway|"
+    r"mysterious door|no reflection|ghost train|phone ringing)\b",
+    re.IGNORECASE,
+)
+GENERIC_VISUAL_TERMS = {
+    "nature", "people", "city", "landscape", "footage", "video", "cinematic",
+    "background", "scenery", "beautiful", "dark", "forest", "building",
+    "technology", "documentary", "scene", "shot", "stock",
+}
 
 
 def choose_topic(hist):
@@ -278,7 +372,7 @@ Investigative documentary rules (mandatory):
 - Build a clear investigation: what is happening now; what reliable evidence shows; what experts
   disagree about; what could plausibly happen next; who would be affected; and what solutions exist.
 - The narration MUST use three clearly separated spoken labels: "FACT:", "FORECAST:", and "WHAT-IF:".
-  FACT contains only documented evidence from the matching catalogue topic. FORECAST describes a
+  FACT contains only documented evidence from the matching catalogue topic and explicitly names an\n  institution from that topic's catalogue. FORECAST describes a
   credible, qualified future risk and its uncertainty. WHAT-IF is explicitly hypothetical and must
   never be presented as an event that has happened or a prediction that is certain.
 - Use specific, checkable evidence. Never invent statistics, studies, report titles, quotations,
@@ -331,12 +425,12 @@ Reply with ONLY a JSON object with these keys:
             )
         except Exception as e:
             print("Polish pass skipped:", e)
-    meta["visual_scenes"] = make_visual_plan(meta["narration"])
+    meta["visual_scenes"] = make_visual_plan(meta["narration"], topic=topic)
     return meta
 
 
-def make_visual_plan(narration):
-    """Create ordered, narration-specific footage searches; never use one global keyword pool."""
+def make_visual_plan(narration, topic=None):
+    """Create ordered, narration-specific searches and reject unrelated or horror imagery."""
     sentences = re.split(r"(?<=[.!?])\s+", narration.strip())
     chunks = [" ".join(sentences[i:i + 3]).strip() for i in range(0, len(sentences), 3)]
     chunks = [chunk for chunk in chunks if chunk]
@@ -347,9 +441,11 @@ def make_visual_plan(narration):
         "You are a documentary footage researcher. Match visuals precisely to narration. "
         "Never imply that illustrative footage documents an event it does not show.",
         "For each numbered narration segment, return 2-4 concise, concrete search phrases "
-        "for authentic stock documentary footage. Keep the same order and number of scenes. "
-        "Avoid generic phrases and avoid repeating the same phrase. If a claim is hypothetical, "
-        "choose clearly illustrative visuals rather than fake news footage. Return ONLY JSON: "
+        "for authentic documentary footage that directly depicts that segment. Use the "
+        "episode's real subject, systems, workers, instruments or ecosystems. Do not use "
+        "horror, haunted-house, fictional-character, fantasy or generic mood imagery. Keep "
+        "the same order and number of scenes. If a claim is hypothetical, use clearly "
+        "illustrative real-world subject footage, never fake news imagery. Return ONLY JSON: "
         '{"scenes":[{"index":1,"keywords":["...","..."]}]}\n\n' + numbered,
         max_tokens=1800, json_mode=True,
     )
@@ -357,13 +453,47 @@ def make_visual_plan(narration):
     scenes = data.get("scenes", [])
     if len(scenes) != len(chunks):
         raise ValueError("AI footage plan did not return one scene for every narration segment.")
+    topic_terms = TOPIC_VISUAL_TERMS.get(topic, set())
     plan = []
+    stopwords = {
+        "the", "and", "for", "with", "that", "this", "from", "into", "are", "was",
+        "were", "will", "could", "would", "should", "have", "has", "had", "its",
+        "their", "they", "them", "then", "than", "when", "where", "what", "which",
+        "who", "how", "why", "about", "after", "before", "while", "because", "there",
+        "these", "those", "some", "more", "most", "many", "much", "very", "already",
+        "also", "only", "not", "but", "yet", "can", "may", "might", "if", "as",
+        "at", "by", "on", "in", "of", "to", "a", "an", "is", "it",
+    }
     for expected, item in enumerate(scenes, 1):
         if item.get("index") != expected or not isinstance(item.get("keywords"), list):
             raise ValueError("AI footage plan has missing or out-of-order scene indexes.")
         keywords = [str(k).strip() for k in item["keywords"] if str(k).strip()][:4]
         if len(keywords) < 2:
             raise ValueError(f"Scene {expected} has too few specific footage searches.")
+        scene_terms = set(re.findall(r"[a-z0-9]+", chunks[expected - 1].lower())) - stopwords
+        keyword_terms = []
+        for keyword in keywords:
+            if BANNED_VISUAL_PATTERN.search(keyword):
+                raise ValueError(
+                    f"Scene {expected} requested fictional or horror footage: {keyword!r}."
+                )
+            tokens = set(re.findall(r"[a-z0-9]+", keyword.lower()))
+            meaningful = tokens - GENERIC_VISUAL_TERMS
+            if len(meaningful) < 1:
+                raise ValueError(f"Scene {expected} contains a generic footage search: {keyword!r}.")
+            if topic and not (tokens & scene_terms or tokens & topic_terms):
+                raise ValueError(
+                    f"Scene {expected} footage search does not match its narration or topic: {keyword!r}."
+                )
+            keyword_terms.append(tokens)
+        if topic and not any(tokens & topic_terms for tokens in keyword_terms):
+            raise ValueError(
+                f"Scene {expected} has no footage search anchored to the documentary topic {topic!r}."
+            )
+        if topic and not any(tokens & scene_terms for tokens in keyword_terms):
+            raise ValueError(
+                f"Scene {expected} has no footage search tied to its specific narration segment."
+            )
         plan.append({"text": chunks[expected - 1], "keywords": keywords})
     return plan
 
@@ -402,7 +532,7 @@ def ensure_viewer_question(meta, fmt):
 
 
 def validate_documentary_script(meta, expected_topic, fmt):
-    """Deterministic editorial gate: reject topic drift and unlabeled/underlength scripts."""
+    """Deterministic editorial gate for topic, evidence attribution and documentary framing."""
     if meta.get("topic") != expected_topic:
         raise ValueError(
             f"Script topic drift: expected {expected_topic!r}, got {meta.get('topic')!r}"
@@ -413,18 +543,70 @@ def validate_documentary_script(meta, expected_topic, fmt):
         raise ValueError(
             f"Short documentary narration must contain 110-160 words; got {len(words)}."
         )
-    required_labels = {
+
+    # Reject recognisable fictional-horror framing before voice or video is rendered.
+    fiction_patterns = (
+        (r"\b(?:one|that)\s+(?:morning|night|evening)\s+when\s+[A-Z][a-z]{2,}\b", 0),
+        (r"\b(?:a|the)\s+(?:man|woman|boy|girl|family|town|village)\s+(?:named|called)\b", re.IGNORECASE),
+        (r"\b(?:ghost|haunted|phantom|monster|demon|no reflection|the phone rang|a phone rang|"
+         r"the last train to|the house that|the road that)\b", re.IGNORECASE),
+        (r"\b(?:he|she)\s+(?:heard|opened|switched on)\s+(?:a|the)\s+(?:door|phone|radio)\b",
+         re.IGNORECASE),
+    )
+    if any(re.search(pattern, narration, flags) for pattern, flags in fiction_patterns):
+        raise ValueError(
+            "Fictional story framing detected; documentary narration must investigate real evidence, "
+            "not invented characters, events or horror tropes."
+        )
+
+    label_patterns = {
         "FACT": r"\bFACT\s*:",
         "FORECAST": r"\bFORECAST\s*:",
         "WHAT-IF": r"\bWHAT[- ]IF\s*:",
     }
-    missing = [label for label, pattern in required_labels.items()
-               if not re.search(pattern, narration, flags=re.IGNORECASE)]
+    matches = {label: re.search(pattern, narration, flags=re.IGNORECASE)
+               for label, pattern in label_patterns.items()}
+    missing = [label for label, match in matches.items() if not match]
     if missing:
         raise ValueError(
             "Documentary narration must clearly separate FACT, FORECAST, and WHAT-IF; "
             f"missing labels: {', '.join(missing)}."
         )
+    positions = [matches[label].start() for label in ("FACT", "FORECAST", "WHAT-IF")]
+    if positions != sorted(positions):
+        raise ValueError("FACT, FORECAST and WHAT-IF sections must appear in that order.")
+    if len(re.findall(r"\b[\w’'-]+\b", narration[:positions[0]])) > 24:
+        raise ValueError("The opening must not contain a long unlabelled story before FACT.")
+
+    fact = narration[matches["FACT"].end():matches["FORECAST"].start()].strip()
+    forecast = narration[matches["FORECAST"].end():matches["WHAT-IF"].start()].strip()
+    what_if = narration[matches["WHAT-IF"].end():].strip()
+
+    institutions = TOPIC_FACT_ATTRIBUTIONS.get(expected_topic, ())
+    if not institutions or not any(re.search(pattern, fact, re.IGNORECASE) for pattern in institutions):
+        raise ValueError(
+            "FACT section must explicitly attribute a documented claim to an institution "
+            "from the matching evidence catalogue."
+        )
+    fact_terms = TOPIC_FACT_TERMS.get(expected_topic)
+    if not fact_terms or not re.search(fact_terms, fact, re.IGNORECASE):
+        raise ValueError("FACT section does not contain a clear factual claim about the selected topic.")
+    if not re.search(
+        r"\b(?:could|may|might|possible|possibly|potential|risk|projected|projection|"
+        r"forecast|uncertain|uncertainty|depends|depending|under certain conditions)\b",
+        forecast, re.IGNORECASE,
+    ):
+        raise ValueError("FORECAST section must qualify uncertainty rather than state certainty.")
+    if not re.search(r"\b(?:if|imagine|hypothetical|scenario)\b", what_if, re.IGNORECASE):
+        raise ValueError("WHAT-IF section must explicitly identify its scenario as hypothetical.")
+
+    if not re.search(
+        r"\b(?:conserve|repair|protect|restore|monitor|prepare|adapt|invest|reduce|improve|"
+        r"strengthen|regulate|train|reskill|plan|share|upgrade|maintain|diversify|transition|"
+        r"build|switch|fund|recycle|support)\b",
+        " ".join(narration.split()[-70:]), re.IGNORECASE,
+    ):
+        raise ValueError("Documentary narration must include a practical response or solution.")
     if not narration.endswith("?"):
         raise ValueError("Documentary narration must end with a thoughtful viewer question.")
     if len(meta.get("sources", [])) < 2:
