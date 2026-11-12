@@ -158,6 +158,19 @@
       "platforms": {},
       "failed_stage": "script and evidence validation",
       "error": "Configured AI provider unavailable; safe documentary generation stopped."
+    },
+    {
+      "time": "2026-11-12T09:46:38Z",
+      "github_run_id": "43194363189",
+      "github_run_attempt": "1",
+      "github_event": "schedule",
+      "format": "short",
+      "topic": "AI and jobs",
+      "status": "generation_failed",
+      "generated": false,
+      "platforms": {},
+      "failed_stage": "script and evidence validation",
+      "error": "Expecting value: line 1 column 1 (char 0)"
     }
   ]
 }
