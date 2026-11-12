@@ -1206,10 +1206,21 @@ def daily_report(hist):
     instagram_count = sum(1 for p in posts_today if p.get("instagram_verified"))
     tiktok_count = sum(1 for p in posts_today if p.get("tiktok_inbox_id"))
     runs_today = [r for r in hist.get("runs", []) if str(r.get("time", "")).startswith(TODAY)]
-    failed_runs = sum(1 for r in runs_today if r.get("status") == "generation_failed")
+    failed_statuses = {
+        "generation_failed", "preflight_failed", "workflow_failed_before_generation",
+        "workflow_failed_during_generation", "workflow_failed_during_delivery",
+        "workflow_completed_without_generation_record",
+    }
+    cancelled_statuses = {
+        "workflow_cancelled_before_generation", "workflow_cancelled_during_generation",
+        "workflow_cancelled_during_delivery",
+    }
+    failed_runs = sum(1 for r in runs_today if r.get("status") in failed_statuses)
+    cancelled_runs = sum(1 for r in runs_today if r.get("status") in cancelled_statuses)
     lines = [
         f"📊 Daily report {TODAY}",
-        f"Scheduled attempts recorded: {len(runs_today)}; generation failures: {failed_runs}",
+        f"Scheduled attempts recorded: {len(runs_today)}; failures: {failed_runs}; "
+        f"cancelled/missed: {cancelled_runs}",
         f"Videos generated: {len(posts_today)} ({s} short, {len(posts_today) - s} long)",
         f"Platform deliveries: YouTube {youtube_count}; Facebook {facebook_count}; "
         f"Instagram {instagram_count}; TikTok inbox {tiktok_count}",
