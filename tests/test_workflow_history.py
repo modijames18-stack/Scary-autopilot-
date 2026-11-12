@@ -71,6 +71,29 @@ class WorkflowHistoryTests(unittest.TestCase):
             self.assertEqual(saved["runs"][0]["status"], "workflow_cancelled_during_generation")
             self.assertFalse(saved["runs"][0]["generated"])
 
+    def test_generated_video_is_preserved_when_delivery_workflow_is_interrupted(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "history.json"
+            path.write_text(json.dumps({
+                "runs": [{
+                    "github_run_id": "12345",
+                    "github_run_attempt": "1",
+                    "status": "generated",
+                    "generated": True,
+                }]
+            }), encoding="utf-8")
+            env = {
+                "GITHUB_EVENT_NAME": "schedule",
+                "GITHUB_RUN_ID": "12345",
+                "GITHUB_RUN_ATTEMPT": "1",
+                "JOB_STATUS": "failure",
+            }
+
+            self.assertTrue(record_workflow_outcome(env, path))
+            saved = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(saved["runs"][0]["status"], "workflow_failed_during_delivery")
+            self.assertTrue(saved["runs"][0]["generated"])
+
     def test_manual_dispatch_is_not_counted_as_a_scheduled_slot(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "history.json"
