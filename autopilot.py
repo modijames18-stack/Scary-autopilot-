@@ -213,7 +213,7 @@ def ask_ai(system, prompt, max_tokens=4000, json_mode=False):
             try:
                 candidates = response.json().get("candidates", [])
                 parts = candidates[0].get("content", {}).get("parts", [])
-            except (ValueError, KeyError, IndexError, TypeError) as exc:
+            except (ValueError, KeyError, IndexError, TypeError, AttributeError) as exc:
                 failures.append(f"{model}: malformed response ({type(exc).__name__})")
                 break
 
@@ -1209,7 +1209,8 @@ def daily_report(hist):
     failed_statuses = {
         "generation_failed", "preflight_failed", "workflow_failed_before_generation",
         "workflow_failed_during_generation", "workflow_failed_during_delivery",
-        "workflow_completed_without_generation_record",
+        "workflow_completed_without_generation_record", "workflow_completed_without_terminal_status",
+        "workflow_ended_without_generation_record",
     }
     cancelled_statuses = {
         "workflow_cancelled_before_generation", "workflow_cancelled_during_generation",
