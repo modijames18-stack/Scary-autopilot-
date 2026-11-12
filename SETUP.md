@@ -17,6 +17,21 @@ Add credentials in GitHub → repository → **Settings → Secrets and variable
 | `TIKTOK_ACCESS_TOKEN` | TikTok Content Posting API inbox upload (`video.upload` scope) |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Optional run alerts |
 
+## AI reliability settings
+
+Gemini uses `gemini-3.8-flash` by default and automatically tries `gemini-3.6-flash` after bounded transient failures. Both paths still pass through the same evidence and documentary-quality checks; a failed provider never triggers an invented fallback script.
+
+Optional GitHub Actions repository **Variables** (not Secrets):
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `GEMINI_MODEL` | `gemini-3.8-flash` | Primary Gemini model |
+| `GEMINI_FALLBACK_MODELS` | `gemini-3.6-flash` | Comma-separated fallback models |
+| `GEMINI_TIMEOUT_SECONDS` | `75` | Per-request timeout, bounded by the application |
+| `GEMINI_ATTEMPTS_PER_MODEL` | `2` | Attempts per model, bounded by the application |
+
+The workflow records scheduled slots that stop before generation and marks interrupted runs in history. Topic rotation advances after each attempted episode, including failed attempts, so a repeated provider outage does not lock the channel onto one topic.
+
 Instagram publishing requires an Instagram **Professional** (Creator or Business) account, the required Meta app permissions, and an account linked to a Facebook Page. The Page access token must include the relevant Instagram publishing and Page permissions. Cloudinary is used because Instagram's publishing API must fetch the video from a publicly accessible HTTPS URL. A Cloudinary account and API credentials are required.
 
 ## Enable publishing
