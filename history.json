@@ -80,6 +80,21 @@
       "error": "Configured AI provider unavailable; safe documentary generation stopped."
     },
     {
+      "time": "2026-11-11T15:37:44Z",
+      "github_run_id": "43050258692",
+      "github_run_number": "28",
+      "github_run_attempt": "1",
+      "github_event": "schedule",
+      "format": "short",
+      "status": "workflow_cancelled_before_generation",
+      "generated": false,
+      "workflow_status": "cancelled",
+      "failed_stage": "runner package installation",
+      "error": "Repeated DNS resolution failures for azure.archive.ubuntu.com prevented apt-get from completing the ffmpeg/font installation; the workflow was cancelled before autopilot started.",
+      "completed_at": "2026-11-11T16:38:00Z",
+      "platforms": {}
+    },
+    {
       "time": "2026-11-11T18:40:49Z",
       "github_run_id": "43079931270",
       "github_run_attempt": "1",
