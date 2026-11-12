@@ -129,6 +129,39 @@ def ai_provider():
     return "anthropic" if env("ANTHROPIC_API_KEY") else "gemini"
 
 
+def safe_ai_error_summary(exc):
+    """Return actionable provider diagnostics without copying raw API responses or secrets."""
+    message = str(exc).lower()
+    provider = ai_provider()
+    if provider == "gemini":
+        if "quota" in message and ("exceed" in message or "limit" in message or "429" in message):
+            return (
+                "Gemini API quota or billing limit reached. Check Google AI Studio usage and "
+                "billing, or configure ANTHROPIC_API_KEY and set AI_PROVIDER=anthropic."
+            )
+        if "429" in message or "resource_exhausted" in message or "rate limit" in message:
+            return (
+                "Gemini API rate limit reached after bounded retries. Check model limits or "
+                "configure ANTHROPIC_API_KEY with AI_PROVIDER=anthropic."
+            )
+        if "timeout" in message or "timed out" in message:
+            return (
+                "Gemini API timed out after bounded retries. Check provider availability or "
+                "configure ANTHROPIC_API_KEY with AI_PROVIDER=anthropic."
+            )
+        if any(token in message for token in ("401", "403", "unauthorized", "permission denied")):
+            return "Gemini API authentication or permission failed. Verify GEMINI_API_KEY and Google AI Studio project access."
+        return "Gemini API request failed after bounded retries; inspect redacted workflow diagnostics."
+
+    if "quota" in message or "billing" in message or "credit" in message:
+        return "Anthropic API quota or billing limit reached. Check the Anthropic account's usage and billing."
+    if "timeout" in message or "timed out" in message:
+        return "Anthropic API timed out. Check provider availability and retry the next scheduled slot."
+    if any(token in message for token in ("401", "403", "unauthorized", "permission denied")):
+        return "Anthropic API authentication or permission failed. Verify ANTHROPIC_API_KEY and model access."
+    return "Anthropic API request failed; inspect redacted workflow diagnostics."
+
+
 def gemini_model_sequence():
     """Return the configured primary Gemini model followed by safe, low-cost fallbacks."""
     primary = env("GEMINI_MODEL", "gemini-3.8-flash")
@@ -192,6 +225,23 @@ def ask_ai(system, prompt, max_tokens=4000, json_mode=False):
                 continue
 
             if response.status_code in (408, 429, 500, 502, 503, 504):
+                response_text = str(getattr(response, "text", "")).lower()
+                hard_quota = response.status_code == 429 and any(
+                    marker in response_text
+                    for marker in (
+                        "you exceeded your current quota",
+                        "quota exceeded for metric",
+                        "quotaexceeded",
+                    )
+                )
+                if hard_quota:
+                    failures.append(f"{model}: quota exhausted (HTTP 429)")
+                    print(
+                        f"Gemini {model} quota is exhausted; skipping redundant retries "
+                        "and trying the next configured model."
+                    )
+                    break
+
                 reason = f"HTTP {response.status_code}: {response.text[:160]}"
                 failures.append(f"{model}: {reason}")
                 print(f"Gemini {model} attempt {attempt + 1}/{attempts_per_model} failed: {reason}")
