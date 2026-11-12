@@ -10,11 +10,12 @@ def _resilient_ai(system, prompt, max_tokens=4000, json_mode=False):
     try:
         return _network_ai(system, prompt, max_tokens=max_tokens, json_mode=json_mode)
     except Exception as exc:
-        print("AI provider unavailable; refusing to generate an unsourced documentary:",
-              str(exc)[:300])
+        detail = app.safe_ai_error_summary(exc)
+        print("AI provider unavailable; refusing to generate an unsourced documentary:", detail)
         raise RuntimeError(
-            "Configured AI provider unavailable; safe documentary generation stopped."
-        ) from exc
+            "Configured AI provider unavailable; safe documentary generation stopped. "
+            + detail
+        ) from None
 
 
 _network_ai = app.ask_ai
