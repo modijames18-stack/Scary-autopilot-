@@ -129,8 +129,22 @@ def ai_provider():
     return "anthropic" if env("ANTHROPIC_API_KEY") else "gemini"
 
 
+def gemini_model_sequence():
+    """Return the configured primary Gemini model followed by safe, low-cost fallbacks."""
+    primary = env("GEMINI_MODEL", "gemini-3.8-flash")
+    fallback = env("GEMINI_FALLBACK_MODELS", "gemini-3.6-flash")
+    models = []
+    for candidate in [primary, *fallback.split(",")]:
+        name = candidate.strip()
+        if name.startswith("models/"):
+            name = name[len("models/"):]
+        if name and name not in models:
+            models.append(name)
+    return models
+
+
 def ask_ai(system, prompt, max_tokens=4000, json_mode=False):
-    """Free Gemini by default; switches to Claude when an Anthropic key is set."""
+    """Use the configured writer; bound Gemini retries and fail over without weakening checks."""
     if ai_provider() == "anthropic":
         client = anthropic.Anthropic(api_key=env("ANTHROPIC_API_KEY"))
         msg = client.messages.create(
@@ -139,41 +153,82 @@ def ask_ai(system, prompt, max_tokens=4000, json_mode=False):
         )
         return "".join(b.text for b in msg.content if b.type == "text")
 
-    model = env("GEMINI_MODEL", "gemini-3.8-flash")
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-    gen = {"maxOutputTokens": max(max_tokens, 2000) + 4000, "temperature": 1.0}
+    models = gemini_model_sequence()
+    attempts_per_model = max(1, min(3, int(env("GEMINI_ATTEMPTS_PER_MODEL", "2"))))
+    timeout_seconds = max(15, min(180, int(env("GEMINI_TIMEOUT_SECONDS", "75"))))
+    # Short scripts and scene plans do not need the old 6,000-token minimum.
+    # Smaller output ceilings reduce latency and free-tier quota use.
+    gen = {"maxOutputTokens": max(int(max_tokens), 512), "temperature": 1.0}
     if json_mode:
         gen["responseMimeType"] = "application/json"
-    body = {
-        "systemInstruction": {"parts": [{"text": system}]},
-        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-        "generationConfig": dict(gen, thinkingConfig={"thinkingLevel": "low"}),
-    }
     headers = {"x-goog-api-key": env("GEMINI_API_KEY"), "Content-Type": "application/json"}
-    last = ""
-    for attempt in range(6):
-        try:
-            r = requests.post(url, headers=headers, json=body, timeout=120)
-        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
-            last = f"network/timeout: {str(e)[:200]}"
-            print("Gemini attempt", attempt + 1, "failed:", last)
-            time.sleep(10)
-            continue
-        if r.status_code == 400 and "thinking" in r.text.lower():
-            body["generationConfig"] = gen  # model does not support thinkingConfig
-            continue
-        if r.status_code in (429, 500, 503):
-            last = r.text[:300]
-            time.sleep(15 * (attempt + 1))
-            continue
-        if not r.ok:
-            raise RuntimeError(f"Gemini error {r.status_code}: {r.text[:400]}")
-        parts = r.json()["candidates"][0]["content"]["parts"]
-        text = "".join(p.get("text", "") for p in parts if not p.get("thought"))
-        if text.strip():
-            return text
-        last = "empty answer"
-    raise RuntimeError(f"Gemini kept failing: {last}")
+    failures = []
+
+    for model in models:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+        body = {
+            "systemInstruction": {"parts": [{"text": system}]},
+            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+            "generationConfig": dict(gen, thinkingConfig={"thinkingLevel": "low"}),
+        }
+        thinking_enabled = True
+        for attempt in range(attempts_per_model):
+            try:
+                response = requests.post(
+                    url, headers=headers, json=body, timeout=timeout_seconds
+                )
+            except requests.exceptions.RequestException as exc:
+                reason = f"network error: {type(exc).__name__}: {str(exc)[:160]}"
+                failures.append(f"{model}: {reason}")
+                print(f"Gemini {model} attempt {attempt + 1}/{attempts_per_model} failed: {reason}")
+                if attempt + 1 < attempts_per_model:
+                    time.sleep(min(5 * (attempt + 1), 10))
+                continue
+
+            if response.status_code == 400 and thinking_enabled and "thinking" in response.text.lower():
+                body["generationConfig"] = gen
+                thinking_enabled = False
+                print(f"Gemini {model} does not accept thinkingConfig; retrying without it.")
+                continue
+
+            if response.status_code in (408, 429, 500, 502, 503, 504):
+                reason = f"HTTP {response.status_code}: {response.text[:160]}"
+                failures.append(f"{model}: {reason}")
+                print(f"Gemini {model} attempt {attempt + 1}/{attempts_per_model} failed: {reason}")
+                if attempt + 1 < attempts_per_model:
+                    time.sleep(min(5 * (attempt + 1), 10))
+                continue
+
+            if response.status_code == 404:
+                reason = f"model unavailable (HTTP 404): {response.text[:120]}"
+                failures.append(f"{model}: {reason}")
+                print(f"Gemini {model} is unavailable; trying the next configured model.")
+                break
+
+            if not response.ok:
+                raise RuntimeError(
+                    f"Gemini error {response.status_code}: {response.text[:300]}"
+                )
+
+            try:
+                candidates = response.json().get("candidates", [])
+                parts = candidates[0].get("content", {}).get("parts", [])
+            except (ValueError, KeyError, IndexError, TypeError, AttributeError) as exc:
+                failures.append(f"{model}: malformed response ({type(exc).__name__})")
+                break
+
+            generated = "".join(
+                part.get("text", "") for part in parts if not part.get("thought")
+            )
+            if generated.strip():
+                return generated
+            failures.append(f"{model}: empty response")
+            break
+
+        print(f"Gemini model {model} exhausted; moving to the next fallback if available.")
+
+    summary = "; ".join(failures[-4:]) or "no Gemini model is configured"
+    raise RuntimeError(f"Gemini models unavailable after bounded retries: {summary}")
 
 
 def yt_credentials():
@@ -193,8 +248,9 @@ def yt_credentials():
 # ---------------------------------------------------------------- 1. research
 def research(fmt, hist):
     """Research current public-interest future risks, cached once per day and format."""
-    if not env("YT_REFRESH_TOKEN"):
-        return "Audience-interest research skipped because YouTube OAuth is not configured; use the curated evidence catalogue and do not treat popularity as proof."
+    if not env("YT_REFRESH_TOKEN") or not publishing_enabled("ENABLE_YOUTUBE_UPLOAD"):
+        return ("Audience-interest research skipped because YouTube publishing is disabled or OAuth "
+                "is not configured; use the curated evidence catalogue and do not treat popularity as proof.")
     cached = hist["patterns"].get(fmt)
     if cached and cached.get("date") == TODAY:
         return cached["notes"]
@@ -336,9 +392,18 @@ GENERIC_VISUAL_TERMS = {
 
 
 def choose_topic(hist):
-    """Choose the next evidence-backed topic in a deliberate, non-random rotation."""
+    """Advance the curated rotation after every attempted episode, not only successful posts."""
+    runs = hist.get("runs", [])
     posts = hist.get("posts", [])
-    previous = posts[-1].get("topic") if posts else None
+    previous = next(
+        (item.get("topic") for item in reversed(runs) if item.get("topic") in TOPICS),
+        None,
+    )
+    if previous is None:
+        previous = next(
+            (item.get("topic") for item in reversed(posts) if item.get("topic") in TOPICS),
+            None,
+        )
     try:
         start = TOPIC_ROTATION.index(previous)
     except ValueError:
@@ -351,7 +416,7 @@ def choose_topic(hist):
 
 
 # ---------------------------------------------------------------- 2. script
-def write_script(fmt, patterns, hist, topic=None):
+def write_script(fmt, patterns, hist, topic=None, include_visual_plan=True):
     topic = topic or choose_topic(hist)
     if topic not in TOPICS:
         raise ValueError(f"Topic is not in the curated evidence catalogue: {topic}")
@@ -449,7 +514,8 @@ Reply with ONLY a JSON object with these keys:
             )
         except Exception as e:
             print("Polish pass skipped:", e)
-    meta["visual_scenes"] = make_visual_plan(meta["narration"], topic=topic)
+    if include_visual_plan:
+        meta["visual_scenes"] = make_visual_plan(meta["narration"], topic=topic)
     return meta
 
 
@@ -1140,10 +1206,22 @@ def daily_report(hist):
     instagram_count = sum(1 for p in posts_today if p.get("instagram_verified"))
     tiktok_count = sum(1 for p in posts_today if p.get("tiktok_inbox_id"))
     runs_today = [r for r in hist.get("runs", []) if str(r.get("time", "")).startswith(TODAY)]
-    failed_runs = sum(1 for r in runs_today if r.get("status") == "generation_failed")
+    failed_statuses = {
+        "generation_failed", "preflight_failed", "workflow_failed_before_generation",
+        "workflow_failed_during_generation", "workflow_failed_during_delivery",
+        "workflow_completed_without_generation_record", "workflow_completed_without_terminal_status",
+        "workflow_ended_without_generation_record",
+    }
+    cancelled_statuses = {
+        "workflow_cancelled_before_generation", "workflow_cancelled_during_generation",
+        "workflow_cancelled_during_delivery",
+    }
+    failed_runs = sum(1 for r in runs_today if r.get("status") in failed_statuses)
+    cancelled_runs = sum(1 for r in runs_today if r.get("status") in cancelled_statuses)
     lines = [
         f"📊 Daily report {TODAY}",
-        f"Scheduled attempts recorded: {len(runs_today)}; generation failures: {failed_runs}",
+        f"Scheduled attempts recorded: {len(runs_today)}; failures: {failed_runs}; "
+        f"cancelled/missed: {cancelled_runs}",
         f"Videos generated: {len(posts_today)} ({s} short, {len(posts_today) - s} long)",
         f"Platform deliveries: YouTube {youtube_count}; Facebook {facebook_count}; "
         f"Instagram {instagram_count}; TikTok inbox {tiktok_count}",
@@ -1243,7 +1321,10 @@ def main():
             patterns = "(audience research unavailable; use established evidence, primary sources, balanced uncertainty, and an investigative documentary structure; do not invent events or claims)"
 
         stage = "script and evidence validation"
-        meta = write_script(fmt, patterns, hist, topic=topic)
+        meta = write_script(fmt, patterns, hist, topic=topic, include_visual_plan=False)
+
+        stage = "scene planning"
+        meta["visual_scenes"] = make_visual_plan(meta["narration"], topic=topic)
         run_record.update({
             "title": meta["title"],
             "source_count": len(meta.get("sources", [])),

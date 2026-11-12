@@ -32,14 +32,25 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install ffmpeg and fonts
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-dejavu-core
+      - name: Ensure ffmpeg and fonts
+        run: |
+          needs_install=false
+          command -v ffmpeg >/dev/null 2>&1 || needs_install=true
+          if ! command -v fc-match >/dev/null 2>&1 || ! fc-match "DejaVu Sans" | grep -qi "DejaVu Sans"; then
+            needs_install=true
+          fi
+          if [ "$needs_install" = true ]; then
+            timeout 180s sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15 update
+            timeout 180s sudo apt-get -o Acquire::Retries=1 install -y --no-install-recommends ffmpeg fontconfig fonts-dejavu-core
+          fi
+          ffmpeg -version | head -n 1
+          fc-match "DejaVu Sans"
 
       - name: Install Python packages
         run: pip install -r requirements.txt
 
       - name: Check Python syntax
-        run: python -m py_compile autopilot.py resilient_runner.py preflight.py
+        run: python -m py_compile autopilot.py resilient_runner.py preflight.py record_workflow.py
 
       - name: Run automated unit tests
         run: python -m unittest discover -s tests -v
@@ -74,6 +85,10 @@ jobs:
           AI_PROVIDER: ${{ vars.AI_PROVIDER }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
+          GEMINI_FALLBACK_MODELS: ${{ vars.GEMINI_FALLBACK_MODELS }}
+          GEMINI_TIMEOUT_SECONDS: ${{ vars.GEMINI_TIMEOUT_SECONDS }}
+          GEMINI_ATTEMPTS_PER_MODEL: ${{ vars.GEMINI_ATTEMPTS_PER_MODEL }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
           YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
@@ -112,7 +127,10 @@ jobs:
 
       - name: Save history
         if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
         run: |
+          python record_workflow.py
           git config user.name "autopilot"
           git config user.email "autopilot@users.noreply.github.com"
           git add history.json
