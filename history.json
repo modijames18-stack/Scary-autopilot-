@@ -223,6 +223,19 @@
       "platforms": {},
       "failed_stage": "script and evidence validation",
       "error": "Expecting value: line 1 column 1 (char 0)"
+    },
+    {
+      "time": "2026-11-13T00:39:38Z",
+      "github_run_id": "43338694285",
+      "github_run_attempt": "1",
+      "github_event": "schedule",
+      "format": "short",
+      "topic": "Air pollution and health",
+      "status": "generation_failed",
+      "generated": false,
+      "platforms": {},
+      "failed_stage": "script and evidence validation",
+      "error": "Expecting value: line 1 column 1 (char 0)"
     }
   ]
 }
