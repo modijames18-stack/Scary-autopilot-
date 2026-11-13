@@ -96,7 +96,7 @@ class VisualPlanTests(unittest.TestCase):
             {"index": 2, "keywords": ["submarine cable ship", "undersea cable landing station"]},
             {"index": 3, "keywords": ["submarine cable repair ship", "underwater fiber optic cable"]},
             {"index": 4, "keywords": ["internet cable landing station", "telecom network exchange"]},
-            {"index": 5, "keywords": ["satellite internet ground station", "satellite communications dish"]},
+            {"index": 5, "keywords": ["satellite internet ground station", "satellite internet communications dish"]},
         ]
         with patch.object(autopilot, "ask_ai", return_value=json.dumps({"scenes": scenes})):
             with self.assertRaisesRegex(ValueError, "at least two concrete topic-specific anchors"):
