@@ -1529,7 +1529,7 @@ def daily_report(hist):
             st = yt.channels().list(part="statistics", mine=True).execute()["items"][0]["statistics"]
             lines.append(f"\n▶️ YouTube: {st.get('subscriberCount', 'hidden')} subs, "
                          f"{st.get('viewCount', 0)} total views, {st.get('videoCount', 0)} videos")
-            ids = [post["youtube_id"] for post in hist["posts"] if post.get("youtube_id")][-50:]
+            ids = [post["youtube_id"] for post in hist["posts"] if post.get("youtube_verified") and post.get("youtube_id")][-50:]
             if ids:
                 items = yt.videos().list(part="snippet,statistics", id=",".join(ids)).execute()["items"]
                 items.sort(key=lambda video: int(video["statistics"].get("viewCount", 0)), reverse=True)
@@ -1543,7 +1543,7 @@ def daily_report(hist):
                     metrics="views,subscribersGained,estimatedRevenue",
                 ).execute()
                 row = (result.get("rows") or [[0, 0, 0]])[0]
-                lines.append(f"Last 7 days: {row[0]} views, +{row[1]} subs, \${row[2]:.2f} est. revenue")
+                lines.append(f"Last 7 days: {row[0]} views, +{row[1]} subs, $" + f"{row[2]:.2f} est. revenue")
             except Exception:
                 lines.append("Revenue: not available yet (channel not monetized, or permission missing)")
         except Exception as exc:
