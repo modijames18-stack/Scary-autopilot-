@@ -133,6 +133,47 @@ class RunHistoryTests(unittest.TestCase):
             "completed_with_delivery_issues",
         )
 
+    @patch.dict("os.environ", {}, clear=True)
+    @patch.object(autopilot, "notify")
+    def test_daily_report_counts_generated_runs_separately_from_posts(self, notify):
+        history = {
+            "posts": [],
+            "runs": [{
+                "time": f"{autopilot.TODAY}T09:00:00Z",
+                "github_event": "schedule",
+                "status": "completed_with_delivery_issues",
+                "generated": True,
+                "format": "short",
+                "platforms": {
+                    "youtube": {"status": "skipped"},
+                    "facebook": {"status": "skipped"},
+                    "instagram": {"status": "skipped"},
+                    "tiktok": {"status": "skipped"},
+                },
+            }],
+        }
+        autopilot.daily_report(history)
+        report = notify.call_args.args[0]
+        self.assertIn("Scheduled attempts recorded: 1", report)
+        self.assertIn("Videos generated: 1 (1 short, 0 long)", report)
+        self.assertIn(
+            "Verified platform deliveries: YouTube 0; Facebook 0; Instagram 0; TikTok inbox 0",
+            report,
+        )
+
+    def test_no_platform_delivery_does_not_create_a_post_record(self):
+        platforms = {
+            "youtube": {"status": "skipped"},
+            "facebook": {"status": "skipped"},
+            "instagram": {"status": "skipped"},
+            "tiktok": {"status": "skipped"},
+        }
+        self.assertFalse(autopilot.has_confirmed_delivery(platforms))
+
+    def test_tiktok_inbox_is_a_confirmed_handoff_not_a_public_post(self):
+        platforms = {"tiktok": {"status": "inbox_uploaded"}}
+        self.assertTrue(autopilot.has_confirmed_delivery(platforms))
+
     def test_all_verified_handoffs_are_marked_completed(self):
         platforms = {
             "youtube": {"status": "verified_upload"},
