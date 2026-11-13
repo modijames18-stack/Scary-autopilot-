@@ -59,6 +59,21 @@ def delivery_completion_status(platforms):
     return "completed_with_delivery_issues"
 
 
+def has_confirmed_delivery(platforms):
+    """Return true only for a platform handoff independently confirmed by its read-back."""
+    expected = {
+        "youtube": "verified_upload",
+        "facebook": "verified_publish",
+        "instagram": "verified_publish",
+        # This is a TikTok inbox draft, not a public post.
+        "tiktok": "inbox_uploaded",
+    }
+    return any(
+        platforms.get(name, {}).get("status") == status
+        for name, status in expected.items()
+    )
+
+
 def publishing_enabled(variable):
     """Publishing is opt-in; missing or non-true switches always disable uploads."""
     return env(variable).lower() == "true"
@@ -516,8 +531,15 @@ def write_script(fmt, patterns, hist, topic=None, include_visual_plan=True):
     topic = topic or choose_topic(hist)
     if topic not in TOPICS:
         raise ValueError(f"Topic is not in the curated evidence catalogue: {topic}")
-    recent = [p["title"] for p in hist["posts"][-40:]]
-    recent_topics = [p.get("topic", "unknown") for p in hist["posts"][-8:]]
+    recent_items = hist.get("posts", [])[-40:] + hist.get("runs", [])[-40:]
+    recent = list(dict.fromkeys(
+        item.get("title") for item in recent_items if item.get("title")
+    ))[-40:]
+    recent_topics = [
+        item.get("topic", "unknown")
+        for item in hist.get("runs", [])[-8:]
+        if item.get("topic")
+    ]
     evidence_catalogue = evidence_catalogue_text()
     if fmt == "short":
         spec = ("A SHORT vertical explainer, 120-150 spoken words, about 50 seconds. "
@@ -1453,13 +1475,29 @@ def verify_instagram_reel(media_id):
 
 # ---------------------------------------------------------------- 6. report
 def daily_report(hist):
-    posts_today = [p for p in hist["posts"] if p["time"][:10] == TODAY]
-    s = sum(1 for p in posts_today if p["format"] == "short")
-    youtube_count = sum(1 for p in posts_today if p.get("youtube_verified"))
-    facebook_count = sum(1 for p in posts_today if p.get("facebook_verified"))
-    instagram_count = sum(1 for p in posts_today if p.get("instagram_verified"))
-    tiktok_count = sum(1 for p in posts_today if p.get("tiktok_inbox_id"))
-    runs_today = [r for r in hist.get("runs", []) if str(r.get("time", "")).startswith(TODAY)]
+    runs_today = [
+        run for run in hist.get("runs", [])
+        if str(run.get("time", "")).startswith(TODAY)
+        and run.get("github_event", "schedule") == "schedule"
+    ]
+    generated_today = [run for run in runs_today if run.get("generated")]
+    short_count = sum(1 for run in generated_today if run.get("format") == "short")
+    youtube_count = sum(
+        1 for run in runs_today
+        if run.get("platforms", {}).get("youtube", {}).get("status") == "verified_upload"
+    )
+    facebook_count = sum(
+        1 for run in runs_today
+        if run.get("platforms", {}).get("facebook", {}).get("status") == "verified_publish"
+    )
+    instagram_count = sum(
+        1 for run in runs_today
+        if run.get("platforms", {}).get("instagram", {}).get("status") == "verified_publish"
+    )
+    tiktok_count = sum(
+        1 for run in runs_today
+        if run.get("platforms", {}).get("tiktok", {}).get("status") == "inbox_uploaded"
+    )
     failed_statuses = {
         "generation_failed", "preflight_failed", "workflow_failed_before_generation",
         "workflow_failed_during_generation", "workflow_failed_during_delivery",
@@ -1470,14 +1508,15 @@ def daily_report(hist):
         "workflow_cancelled_before_generation", "workflow_cancelled_during_generation",
         "workflow_cancelled_during_delivery",
     }
-    failed_runs = sum(1 for r in runs_today if r.get("status") in failed_statuses)
-    cancelled_runs = sum(1 for r in runs_today if r.get("status") in cancelled_statuses)
+    failed_runs = sum(1 for run in runs_today if run.get("status") in failed_statuses)
+    cancelled_runs = sum(1 for run in runs_today if run.get("status") in cancelled_statuses)
     lines = [
         f"📊 Daily report {TODAY}",
         f"Scheduled attempts recorded: {len(runs_today)}; failures: {failed_runs}; "
         f"cancelled/missed: {cancelled_runs}",
-        f"Videos generated: {len(posts_today)} ({s} short, {len(posts_today) - s} long)",
-        f"Platform deliveries: YouTube {youtube_count}; Facebook {facebook_count}; "
+        f"Videos generated: {len(generated_today)} ({short_count} short, "
+        f"{len(generated_today) - short_count} long)",
+        f"Verified platform deliveries: YouTube {youtube_count}; Facebook {facebook_count}; "
         f"Instagram {instagram_count}; TikTok inbox {tiktok_count}",
         "TikTok inbox deliveries are drafts awaiting creator publishing.",
     ]
@@ -1490,40 +1529,48 @@ def daily_report(hist):
             st = yt.channels().list(part="statistics", mine=True).execute()["items"][0]["statistics"]
             lines.append(f"\n▶️ YouTube: {st.get('subscriberCount', 'hidden')} subs, "
                          f"{st.get('viewCount', 0)} total views, {st.get('videoCount', 0)} videos")
-            ids = [p["youtube_id"] for p in hist["posts"] if p.get("youtube_id")][-50:]
+            ids = [post["youtube_id"] for post in hist["posts"] if post.get("youtube_id")][-50:]
             if ids:
                 items = yt.videos().list(part="snippet,statistics", id=",".join(ids)).execute()["items"]
-                items.sort(key=lambda v: int(v["statistics"].get("viewCount", 0)), reverse=True)
+                items.sort(key=lambda video: int(video["statistics"].get("viewCount", 0)), reverse=True)
                 top = items[0]
                 lines.append(f"Top video: {top['snippet']['title'][:55]} ({top['statistics'].get('viewCount', 0)} views)")
             ya = build("youtubeAnalytics", "v2", credentials=creds, cache_discovery=False)
             start = (NOW - dt.timedelta(days=7)).strftime("%Y-%m-%d")
             try:
-                r = ya.reports().query(ids="channel==MINE", startDate=start, endDate=TODAY,
-                                       metrics="views,subscribersGained,estimatedRevenue").execute()
-                row = (r.get("rows") or [[0, 0, 0]])[0]
-                lines.append(f"Last 7 days: {row[0]} views, +{row[1]} subs, ${row[2]:.2f} est. revenue")
+                result = ya.reports().query(
+                    ids="channel==MINE", startDate=start, endDate=TODAY,
+                    metrics="views,subscribersGained,estimatedRevenue",
+                ).execute()
+                row = (result.get("rows") or [[0, 0, 0]])[0]
+                lines.append(f"Last 7 days: {row[0]} views, +{row[1]} subs, \${row[2]:.2f} est. revenue")
             except Exception:
                 lines.append("Revenue: not available yet (channel not monetized, or permission missing)")
-        except Exception as e:
-            lines.append(f"YouTube report failed: {str(e)[:150]}")
+        except Exception as exc:
+            lines.append(f"YouTube report failed: {str(exc)[:150]}")
 
     if env("FB_PAGE_TOKEN"):
         try:
-            g = f"https://graph.facebook.com/{env('META_GRAPH_VERSION', 'v24.0')}"
+            graph = f"https://graph.facebook.com/{env('META_GRAPH_VERSION', 'v24.0')}"
             page, token = env("FB_PAGE_ID"), env("FB_PAGE_TOKEN")
-            info = _fb_check(requests.get(f"{g}/{page}", params={
-                "fields": "fan_count,followers_count", "access_token": token}, timeout=30))
+            info = _fb_check(requests.get(
+                f"{graph}/{page}",
+                params={"fields": "fan_count,followers_count", "access_token": token},
+                timeout=30,
+            ))
             lines.append(f"\n📘 Facebook: {info.get('followers_count', info.get('fan_count', '?'))} followers")
             try:
-                vids = _fb_check(requests.get(f"{g}/{page}/videos", params={
-                    "fields": "views", "limit": 25, "access_token": token}, timeout=30)).get("data", [])
-                lines.append(f"Views on last {len(vids)} videos: {sum(v.get('views', 0) for v in vids)}")
+                videos = _fb_check(requests.get(
+                    f"{graph}/{page}/videos",
+                    params={"fields": "views", "limit": 25, "access_token": token},
+                    timeout=30,
+                )).get("data", [])
+                lines.append(f"Views on last {len(videos)} videos: {sum(video.get('views', 0) for video in videos)}")
             except Exception:
                 lines.append("Video views: not available from Facebook right now")
             lines.append("Facebook earnings are not exposed to apps; check Meta Business Suite.")
-        except Exception as e:
-            lines.append(f"Facebook report failed: {str(e)[:150]}")
+        except Exception as exc:
+            lines.append(f"Facebook report failed: {str(exc)[:150]}")
 
     if env("IG_USER_ID") and env("FB_PAGE_TOKEN") and publishing_enabled("ENABLE_INSTAGRAM_PUBLISH"):
         lines.append("\n📸 Instagram: Reels publishing configured")
@@ -1736,7 +1783,8 @@ def main():
             platform_result("tiktok", "failed", error=str(e)[:500])
             notify(f"❌ TikTok inbox upload failed: {str(e)[:700]}")
 
-    hist["posts"].append(record)
+    if has_confirmed_delivery(run_record["platforms"]):
+        hist["posts"].append(record)
     run_record["status"] = delivery_completion_status(run_record["platforms"])
     run_record["completed_at"] = dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
     save_history(hist)
