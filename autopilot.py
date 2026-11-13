@@ -1045,7 +1045,7 @@ def find_candidates(keywords, fmt, W, topic=None):
                                 if page.ok:
                                     source = page.text[:500000]
                                     meta_values = re.findall(
-                                        r"<meta[^>]+(?:name|property)=[\\"'](?:og:title|og:description|description|keywords)[\\"'][^>]+content=[\\"']([^\\"']*)",
+                                        r"""<meta[^>]+(?:name|property)=["'](?:og:title|og:description|description|keywords)["'][^>]+content=["']([^"']*)""",
                                         source,
                                         flags=re.IGNORECASE,
                                     )
