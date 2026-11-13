@@ -9,6 +9,7 @@ import asyncio
 import datetime as dt
 import json
 import hashlib
+import html
 import os
 import random
 import re
@@ -1032,6 +1033,30 @@ def find_candidates(keywords, fmt, W, topic=None):
                         str(video.get(field, ""))
                         for field in ("tags", "title", "description", "name")
                     )
+                    if not stock_tags_match(metadata, kw, topic):
+                        page_url = str(video.get("url", ""))
+                        if page_url.startswith("https://www.pexels.com/video/"):
+                            try:
+                                page = requests.get(
+                                    page_url,
+                                    headers={"User-Agent": "Mozilla/5.0 ScaryAutopilot/1.0"},
+                                    timeout=12,
+                                )
+                                if page.ok:
+                                    source = page.text[:500000]
+                                    meta_values = re.findall(
+                                        r"<meta[^>]+(?:name|property)=[\\"'](?:og:title|og:description|description|keywords)[\\"'][^>]+content=[\\"']([^\\"']*)",
+                                        source,
+                                        flags=re.IGNORECASE,
+                                    )
+                                    title_values = re.findall(
+                                        r"<title[^>]*>(.*?)</title>",
+                                        source,
+                                        flags=re.IGNORECASE | re.DOTALL,
+                                    )
+                                    metadata += " " + html.unescape(" ".join(meta_values + title_values))
+                            except Exception as exc:
+                                print("Pexels clip metadata check unavailable:", type(exc).__name__)
                     if not stock_tags_match(metadata, kw, topic):
                         rejected += 1
                         continue
