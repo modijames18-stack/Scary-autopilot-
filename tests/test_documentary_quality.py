@@ -133,6 +133,19 @@ class RunHistoryTests(unittest.TestCase):
             "completed_with_delivery_issues",
         )
 
+    def test_no_platform_delivery_does_not_create_a_post_record(self):
+        platforms = {
+            "youtube": {"status": "skipped"},
+            "facebook": {"status": "skipped"},
+            "instagram": {"status": "skipped"},
+            "tiktok": {"status": "skipped"},
+        }
+        self.assertFalse(autopilot.has_confirmed_delivery(platforms))
+
+    def test_tiktok_inbox_is_a_confirmed_handoff_not_a_public_post(self):
+        platforms = {"tiktok": {"status": "inbox_uploaded"}}
+        self.assertTrue(autopilot.has_confirmed_delivery(platforms))
+
     def test_all_verified_handoffs_are_marked_completed(self):
         platforms = {
             "youtube": {"status": "verified_upload"},
