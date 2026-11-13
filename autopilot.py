@@ -433,7 +433,7 @@ TOPIC_VISUAL_ANCHORS = {
     "Water scarcity and drying rivers": {
         "water", "river", "drought", "dry", "reservoir", "groundwater", "aquifer",
         "irrigation", "wetland", "well", "canal", "watershed", "dam", "crop",
-        "farmer", "sampling", "monitor",
+        "farmer", "sampling", "monitor", "flood",
     },
     "AI and jobs": {
         "ai", "worker", "employee", "factory", "robot", "automation", "office",
@@ -970,7 +970,7 @@ def visual_tokens(value):
         "substations": "substation", "transformers": "transformer",
         "turbines": "turbine", "blooms": "bloom", "algal": "algae",
         "vehicles": "vehicle", "emissions": "emission", "storms": "storm",
-        "floods": "flood", "droughts": "drought", "robots": "robot",
+        "floods": "flood", "droughts": "drought", "robots": "robot", "robotics": "robot",
         "factories": "factory", "offices": "office", "chips": "chip",
         "algorithms": "algorithm", "regulators": "regulator",
         "aquifers": "aquifer", "reservoirs": "reservoir", "wetlands": "wetland",
