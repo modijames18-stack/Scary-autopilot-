@@ -428,6 +428,51 @@ TOPIC_VISUAL_TERMS = {
     },
 }
 
+
+TOPIC_VISUAL_ANCHORS = {
+    "Water scarcity and drying rivers": {
+        "water", "river", "drought", "dry", "reservoir", "groundwater", "aquifer",
+        "irrigation", "wetland", "well", "canal", "watershed", "dam", "crop",
+        "farmer", "sampling", "monitor",
+    },
+    "AI and jobs": {
+        "ai", "worker", "employee", "factory", "robot", "automation", "office",
+        "workplace", "training", "skill", "warehouse", "computer", "assembly",
+        "production", "classroom", "reskilling",
+    },
+    "Global AI governance and concentration of power": {
+        "ai", "algorithm", "server", "data", "center", "datacenter", "computer",
+        "chip", "semiconductor", "government", "conference", "policy", "regulator",
+        "laboratory", "cloud", "compute",
+    },
+    "Power-grid resilience and worldwide blackout scenarios": {
+        "power", "electricity", "grid", "transmission", "substation", "transformer",
+        "powerline", "turbine", "solar", "wind", "generator", "powerplant",
+        "utility", "battery",
+    },
+    "Internet infrastructure and global connectivity": {
+        "internet", "submarine", "undersea", "underwater", "cable", "fiber", "fibre",
+        "optic", "telecom", "server", "router", "data", "center", "datacenter",
+        "satellite", "ship", "landing", "station", "exchange",
+    },
+    "Climate change, extreme weather and food security": {
+        "climate", "heatwave", "drought", "flood", "storm", "wildfire", "glacier",
+        "crop", "farm", "farmer", "weather", "emission", "rainfall", "floodplain",
+    },
+    "Ocean warming, sea-level rise and glacier loss": {
+        "ocean", "sea", "glacier", "iceberg", "coral", "reef", "coast", "coastal",
+        "marine", "tide", "warming", "underwater",
+    },
+    "Air pollution and health": {
+        "air", "pollution", "smog", "particulate", "emission", "monitor", "factory",
+        "vehicle", "exhaust", "traffic", "industrial", "haze", "airquality",
+    },
+    "Red or discolored rivers and harmful algal blooms": {
+        "river", "algae", "algal", "bloom", "cyanobacteria", "lake", "runoff",
+        "sampling", "testing", "microscope", "nutrient", "water", "redtide",
+    },
+}
+
 BANNED_VISUAL_PATTERN = re.compile(
     r"\b(?:haunted|ghost|phantom|monster|demon|horror|creepy|blood|"
     r"dark hallway|dark corridor|black forest|abandoned house|abandoned hallway|"
@@ -565,35 +610,63 @@ Reply with ONLY a JSON object with these keys:
         except Exception as e:
             print("Polish pass skipped:", e)
     if include_visual_plan:
-        meta["visual_scenes"] = make_visual_plan(meta["narration"], topic=topic)
+        meta["visual_scenes"] = make_visual_plan(meta["narration"], topic=topic, fmt=fmt)
     return meta
 
 
-def make_visual_plan(narration, topic=None):
-    """Create ordered, narration-specific searches and reject unrelated or horror imagery."""
+def make_visual_plan(narration, topic=None, fmt="short"):
+    """Create fine-grained narration scenes and require concrete topic-specific searches."""
     sentences = re.split(r"(?<=[.!?])\s+", narration.strip())
-    chunks = [" ".join(sentences[i:i + 3]).strip() for i in range(0, len(sentences), 3)]
-    chunks = [chunk for chunk in chunks if chunk]
+    sentences = [sentence.strip() for sentence in sentences if sentence.strip()]
+    group_size = 1 if fmt == "short" else 2
+    chunks = [
+        " ".join(sentences[i:i + group_size]).strip()
+        for i in range(0, len(sentences), group_size)
+    ]
     if not chunks:
         raise ValueError("Narration is empty; cannot plan documentary scenes.")
+    if fmt == "short" and len(chunks) < 5:
+        raise ValueError(
+            "A short documentary needs at least five distinct narration scenes; "
+            f"only {len(chunks)} were available."
+        )
+
     numbered = "\n".join(f"{i + 1}. {chunk}" for i, chunk in enumerate(chunks))
+    topic_anchors = TOPIC_VISUAL_ANCHORS.get(topic, set())
+    if topic and len(topic_anchors) < 2:
+        raise ValueError(f"No strict visual anchors are configured for topic {topic!r}.")
+
     raw = ask_ai(
         "You are a documentary footage researcher. Match visuals precisely to narration. "
         "Never imply that illustrative footage documents an event it does not show.",
         "For each numbered narration segment, return 2-4 concise, concrete search phrases "
-        "for authentic documentary footage that directly depicts that segment. Use the "
-        "episode's real subject, systems, workers, instruments or ecosystems. Do not use "
-        "horror, haunted-house, fictional-character, fantasy or generic mood imagery. Keep "
-        "the same order and number of scenes. If a claim is hypothetical, use clearly "
-        "illustrative real-world subject footage, never fake news imagery. Return ONLY JSON: "
+        "for authentic documentary footage that directly depicts that segment. Use physical "
+        "subjects such as the actual ecosystem, equipment, infrastructure, workers or scientific "
+        "instruments. Every phrase must contain at least TWO concrete visual anchors for the "
+        f"topic {topic!r}; do not rely on ambiguous words such as 'cable', 'network', 'data', "
+        "'global', 'service' or 'technology' by themselves. Include at least one detail from "
+        "the narration segment. Keep the same order and number of scenes. If a claim is "
+        "hypothetical, use clearly illustrative real-world subject footage, never fake news "
+        "imagery. Return ONLY JSON: "
         '{"scenes":[{"index":1,"keywords":["...","..."]}]}\n\n' + numbered,
         max_tokens=1800, json_mode=True,
     )
-    data = json.loads(raw[raw.find("{"):raw.rfind("}") + 1])
-    scenes = data.get("scenes", [])
+    try:
+        start, end = raw.find("{"), raw.rfind("}")
+        if start < 0 or end <= start:
+            raise ValueError("AI footage plan did not contain a JSON object.")
+        data = json.loads(raw[start:end + 1])
+    except (TypeError, json.JSONDecodeError, ValueError) as exc:
+        raise ValueError(
+            "AI footage plan returned invalid JSON; refusing to use unverified filler footage."
+        ) from None
+
+    scenes = data.get("scenes", []) if isinstance(data, dict) else []
     if len(scenes) != len(chunks):
         raise ValueError("AI footage plan did not return one scene for every narration segment.")
-    topic_terms = TOPIC_VISUAL_TERMS.get(topic, set())
+
+    topic_terms = visual_tokens(" ".join(TOPIC_VISUAL_TERMS.get(topic, set())))
+    anchor_terms = visual_tokens(" ".join(topic_anchors))
     plan = []
     stopwords = {
         "the", "and", "for", "with", "that", "this", "from", "into", "are", "was",
@@ -605,19 +678,20 @@ def make_visual_plan(narration, topic=None):
         "at", "by", "on", "in", "of", "to", "a", "an", "is", "it",
     }
     for expected, item in enumerate(scenes, 1):
-        if item.get("index") != expected or not isinstance(item.get("keywords"), list):
+        if not isinstance(item, dict) or item.get("index") != expected or not isinstance(item.get("keywords"), list):
             raise ValueError("AI footage plan has missing or out-of-order scene indexes.")
         keywords = [str(k).strip() for k in item["keywords"] if str(k).strip()][:4]
         if len(keywords) < 2:
             raise ValueError(f"Scene {expected} has too few specific footage searches.")
-        scene_terms = set(re.findall(r"[a-z0-9]+", chunks[expected - 1].lower())) - stopwords
+
+        scene_terms = visual_tokens(chunks[expected - 1]) - stopwords
         keyword_terms = []
         for keyword in keywords:
             if BANNED_VISUAL_PATTERN.search(keyword):
                 raise ValueError(
                     f"Scene {expected} requested fictional or horror footage: {keyword!r}."
                 )
-            tokens = set(re.findall(r"[a-z0-9]+", keyword.lower()))
+            tokens = visual_tokens(keyword)
             meaningful = tokens - GENERIC_VISUAL_TERMS
             if len(meaningful) < 1:
                 raise ValueError(f"Scene {expected} contains a generic footage search: {keyword!r}.")
@@ -625,22 +699,40 @@ def make_visual_plan(narration, topic=None):
                 raise ValueError(
                     f"Scene {expected} footage search does not match its narration or topic: {keyword!r}."
                 )
+            anchor_overlap = tokens & anchor_terms
+            if topic and len(anchor_overlap) < 2:
+                raise ValueError(
+                    f"Scene {expected} footage search is ambiguous; it needs at least two "
+                    f"concrete topic-specific anchors: {keyword!r}."
+                )
             keyword_terms.append(tokens)
-        if topic and not any(tokens & topic_terms for tokens in keyword_terms):
-            raise ValueError(
-                f"Scene {expected} has no footage search anchored to the documentary topic {topic!r}."
-            )
+
         if topic and not any(tokens & scene_terms for tokens in keyword_terms):
             raise ValueError(
                 f"Scene {expected} has no footage search tied to its specific narration segment."
+            )
+        if topic and not any(len(tokens & anchor_terms) >= 2 for tokens in keyword_terms):
+            raise ValueError(
+                f"Scene {expected} has no sufficiently specific search for topic {topic!r}."
             )
         plan.append({"text": chunks[expected - 1], "keywords": keywords})
     return plan
 
 
 def parse_meta(raw):
+    if not isinstance(raw, str) or not raw.strip():
+        raise ValueError("AI script response was empty; refusing to generate an unsourced documentary.")
     start, end = raw.find("{"), raw.rfind("}")
-    meta = json.loads(raw[start:end + 1], strict=False)
+    if start < 0 or end <= start:
+        raise ValueError("AI script response did not contain a JSON object; refusing to continue.")
+    try:
+        meta = json.loads(raw[start:end + 1], strict=False)
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            f"AI script response was malformed JSON (line {exc.lineno}, column {exc.colno})."
+        ) from None
+    if not isinstance(meta, dict):
+        raise ValueError("AI script response must be a JSON object.")
     for k in ("topic", "title", "description", "narration", "visual_keywords"):
         if k not in meta:
             raise ValueError(f"Script missing '{k}'")
@@ -865,53 +957,117 @@ def make_voice_and_captions(fmt, narration):
 
 
 # ---------------------------------------------------------------- 4. video
-def find_candidates(keywords, fmt, W):
-    """Returns a list of (id, download_url, duration). Uses Pixabay (free key) or Pexels."""
+def visual_tokens(value):
+    """Normalize stock-search metadata so singulars and common cable synonyms compare."""
+    aliases = {
+        "submarine": "underwater", "undersea": "underwater",
+        "fibre": "fiber", "fibres": "fiber", "fibers": "fiber",
+        "telecommunications": "telecom", "telecommunication": "telecom",
+        "datacentre": "datacenter", "datacentres": "datacenter",
+        "servers": "server", "routers": "router", "cables": "cable",
+        "rivers": "river", "workers": "worker", "employees": "employee",
+        "farmers": "farmer", "crops": "crop", "glaciers": "glacier",
+        "substations": "substation", "transformers": "transformer",
+        "turbines": "turbine", "blooms": "bloom", "algal": "algae",
+        "vehicles": "vehicle", "emissions": "emission", "storms": "storm",
+        "floods": "flood", "droughts": "drought", "robots": "robot",
+        "factories": "factory", "offices": "office", "chips": "chip",
+        "algorithms": "algorithm", "regulators": "regulator",
+        "aquifers": "aquifer", "reservoirs": "reservoir", "wetlands": "wetland",
+        "wells": "well", "dams": "dam", "satellites": "satellite",
+        "ships": "ship", "routers": "router", "skills": "skill",
+    }
+    return {
+        aliases.get(token, token)
+        for token in re.findall(r"[a-z0-9]+", str(value).lower())
+    }
+
+
+def stock_tags_match(tags, keyword, topic):
+    """Accept a clip only when its own metadata confirms two topic-specific query anchors."""
+    if not tags or not keyword or not topic:
+        return False
+    anchors = visual_tokens(" ".join(TOPIC_VISUAL_ANCHORS.get(topic, set())))
+    matched = visual_tokens(tags) & visual_tokens(keyword) & anchors
+    return len(matched) >= 2
+
+
+def find_candidates(keywords, fmt, W, topic=None):
+    """Search stock footage, rejecting results whose returned metadata is not topic-specific."""
     per_kw = []
     pix, pex = env("PIXABAY_API_KEY"), env("PEXELS_API_KEY")
     for kw in keywords[:8]:
         found = []
-        # Try Pixabay first when configured, then fall back to Pexels if it
-        # errors or returns no usable clips. One provider's empty result should
-        # not prevent the other free provider from being used.
+        rejected = 0
         if pix:
             try:
-                r = requests.get("https://pixabay.com/api/videos/",
-                                 params={"key": pix, "q": kw[:90], "per_page": 12, "safesearch": "true"},
-                                 timeout=30)
+                r = requests.get(
+                    "https://pixabay.com/api/videos/",
+                    params={"key": pix, "q": kw[:90], "per_page": 12, "safesearch": "true"},
+                    timeout=30,
+                )
                 r.raise_for_status()
-                for h in r.json().get("hits", []):
-                    vs = h.get("videos", {})
-                    pick = vs.get("large") if vs.get("large", {}).get("url") else vs.get("medium")
+                for hit in r.json().get("hits", []):
+                    if not stock_tags_match(hit.get("tags", ""), kw, topic):
+                        rejected += 1
+                        continue
+                    videos = hit.get("videos", {})
+                    pick = videos.get("large") if videos.get("large", {}).get("url") else videos.get("medium")
                     if pick and pick.get("url"):
-                        found.append((f"px{h['id']}", pick["url"], float(h.get("duration", 7))))
-            except Exception as e:
-                print("Pixabay footage search failed:", kw, e)
+                        found.append((f"px{hit['id']}", pick["url"], float(hit.get("duration", 7))))
+            except Exception as exc:
+                print("Pixabay footage search failed:", kw, type(exc).__name__)
         if not found and pex:
             try:
                 orient = "portrait" if fmt == "short" else "landscape"
-                r = requests.get("https://api.pexels.com/videos/search",
-                                 headers={"Authorization": pex},
-                                 params={"query": kw, "orientation": orient, "per_page": 8}, timeout=30)
+                r = requests.get(
+                    "https://api.pexels.com/videos/search",
+                    headers={"Authorization": pex},
+                    params={"query": kw, "orientation": orient, "per_page": 8},
+                    timeout=30,
+                )
                 r.raise_for_status()
-                for v in r.json().get("videos", []):
-                    files = [f for f in v.get("video_files", [])
-                             if f.get("file_type") == "video/mp4" and f.get("width")]
+                for video in r.json().get("videos", []):
+                    metadata = " ".join(
+                        str(video.get(field, ""))
+                        for field in ("tags", "title", "description", "name")
+                    )
+                    if not stock_tags_match(metadata, kw, topic):
+                        rejected += 1
+                        continue
+                    files = [
+                        item for item in video.get("video_files", [])
+                        if item.get("file_type") == "video/mp4" and item.get("width")
+                    ]
                     if not files:
                         continue
-                    ok = [f for f in files if f["width"] >= W]
-                    f = min(ok, key=lambda x: x["width"]) if ok else max(files, key=lambda x: x["width"])
-                    found.append((f"pe{v['id']}", f["link"], float(v.get("duration", 7))))
-            except Exception as e:
-                print("Pexels footage search failed:", kw, e)
-        # Keep provider relevance order; random shuffling can select unrelated footage.
+                    suitable = [item for item in files if item["width"] >= W]
+                    selected = min(suitable, key=lambda item: item["width"]) if suitable else max(
+                        files, key=lambda item: item["width"]
+                    )
+                    found.append((
+                        f"pe{video['id']}", selected["link"],
+                        float(video.get("duration", 7)),
+                    ))
+            except Exception as exc:
+                print("Pexels footage search failed:", kw, type(exc).__name__)
+
+        if rejected and not found:
+            print(
+                f"Stock footage relevance check rejected {rejected} results "
+                f"for scene search: {kw!r}"
+            )
         per_kw.append(found[:8])
-    return [lst[i] for i in range(4) for lst in per_kw if i < len(lst)]
+
+    candidates = [items[i] for i in range(4) for items in per_kw if i < len(items)]
+    if not candidates:
+        print("No stock footage passed the topic-tag relevance check.")
+    return candidates
 
 
-def fetch_clips(keywords, fmt, need, W, H):
+def fetch_clips(keywords, fmt, need, W, H, topic=None):
     max_clips = 12 if fmt == "short" else 36
-    order = find_candidates(keywords, fmt, W)
+    order = find_candidates(keywords, fmt, W, topic=topic)
     clips, seen, total = [], set(), 0.0
     for vid_id, link, vdur in order:
         if vid_id in seen or len(clips) >= max_clips or total >= need + 2:
@@ -925,15 +1081,18 @@ def fetch_clips(keywords, fmt, need, W, H):
                 with open(raw, "wb") as fh:
                     for chunk in resp.iter_content(1 << 20):
                         fh.write(chunk)
-            d = min(vdur, 7.0)
-            run(["ffmpeg", "-y", "-i", raw.name, "-t", str(d), "-an",
-                 "-vf", f"scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},"
-                        f"fps=30,eq=brightness=-0.06:saturation=0.75,setsar=1",
-                 "-c:v", "libx264", "-preset", "ultrafast", "-crf", "26", "-pix_fmt", "yuv420p", seg.name])
-            clips.append((seg.name, d))
-            total += d
-        except Exception as e:
-            print("Clip failed:", e)
+            duration = min(vdur, 7.0)
+            run([
+                "ffmpeg", "-y", "-i", raw.name, "-t", str(duration), "-an",
+                "-vf", f"scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},"
+                       f"fps=30,eq=brightness=-0.06:saturation=0.75,setsar=1",
+                "-c:v", "libx264", "-preset", "ultrafast", "-crf", "26",
+                "-pix_fmt", "yuv420p", seg.name,
+            ])
+            clips.append((seg.name, duration))
+            total += duration
+        except Exception as exc:
+            print("Clip download or conversion failed:", type(exc).__name__)
         finally:
             raw.unlink(missing_ok=True)
     return clips
@@ -947,39 +1106,59 @@ def build_video(fmt, meta, duration):
     word_counts = [max(1, len(scene["text"].split())) for scene in scenes]
     total_words = sum(word_counts)
     visual_entries = []
+    audit = []
     for scene_no, (scene, count) in enumerate(zip(scenes, word_counts), 1):
         scene_duration = duration * count / total_words
-        clips = fetch_clips(scene["keywords"], fmt, scene_duration, W, H)
+        clips = fetch_clips(
+            scene["keywords"], fmt, scene_duration, W, H, topic=meta.get("topic")
+        )
         if not clips:
             raise RuntimeError(
-                f"No matching footage found for narration scene {scene_no}: "
+                f"No stock footage passed the relevance check for narration scene {scene_no}: "
                 f"{scene['keywords']}. Refusing unrelated filler footage."
             )
-        scene_entries, covered, i = [], 0.0, 0
+        audit.append({
+            "scene": scene_no,
+            "matched_clip_count": len(clips),
+            "searches": list(scene["keywords"]),
+        })
+        scene_entries, covered, index = [], 0.0, 0
         while covered < scene_duration + 0.2:
-            name, clip_duration = clips[i % len(clips)]
+            name, clip_duration = clips[index % len(clips)]
             scene_entries.append(f"file '{name}'")
             covered += clip_duration
-            i += 1
+            index += 1
         scene_list = WORK / f"scene_{scene_no:02}.txt"
         scene_list.write_text("\n".join(scene_entries), encoding="utf-8")
         scene_video = f"scene_{scene_no:02}.mp4"
-        run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", scene_list.name,
-             "-t", f"{scene_duration:.2f}", "-c", "copy", scene_video])
+        run([
+            "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", scene_list.name,
+            "-t", f"{scene_duration:.2f}", "-c", "copy", scene_video,
+        ])
         visual_entries.append(f"file '{scene_video}'")
+
+    meta["visual_clip_audit"] = audit
     (WORK / "list.txt").write_text("\n".join(visual_entries), encoding="utf-8")
-    run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", "list.txt",
-         "-t", f"{duration + 0.5:.2f}", "-c", "copy", "visual.mp4"])
-    style = ("FontName=DejaVu Sans,Bold=1,FontSize=11,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,"
-             "BorderStyle=1,Outline=2,Alignment=2,MarginV=90") if fmt == "short" else \
-            ("FontName=DejaVu Sans,Bold=1,FontSize=15,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,"
-             "BorderStyle=1,Outline=2,Alignment=2,MarginV=18")
-    out = f"final_{fmt}.mp4"
-    run(["ffmpeg", "-y", "-i", "visual.mp4", "-i", "voice.mp3",
-         "-vf", f"subtitles=captions.srt:force_style='{style}'",
-         "-map", "0:v", "-map", "1:a", "-c:v", "libx264", "-preset", "veryfast", "-crf", "24",
-         "-c:a", "aac", "-b:a", "160k", "-t", f"{duration + 0.5:.2f}", out])
-    return WORK / out
+    run([
+        "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", "list.txt",
+        "-t", f"{duration + 0.5:.2f}", "-c", "copy", "visual.mp4",
+    ])
+    style = (
+        "FontName=DejaVu Sans,Bold=1,FontSize=11,PrimaryColour=&H00FFFFFF,"
+        "OutlineColour=&H00000000,BorderStyle=1,Outline=2,Alignment=2,MarginV=90"
+    ) if fmt == "short" else (
+        "FontName=DejaVu Sans,Bold=1,FontSize=15,PrimaryColour=&H00FFFFFF,"
+        "OutlineColour=&H00000000,BorderStyle=1,Outline=2,Alignment=2,MarginV=18"
+    )
+    output = f"final_{fmt}.mp4"
+    run([
+        "ffmpeg", "-y", "-i", "visual.mp4", "-i", "voice.mp3",
+        "-vf", f"subtitles=captions.srt:force_style='{style}'",
+        "-map", "0:v", "-map", "1:a", "-c:v", "libx264", "-preset", "veryfast",
+        "-crf", "24", "-c:a", "aac", "-b:a", "160k",
+        "-t", f"{duration + 0.5:.2f}", output,
+    ])
+    return WORK / output
 
 
 # ---------------------------------------------------------------- 5. publish
@@ -1387,11 +1566,14 @@ def main():
 
         stage = "scene footage and rendering"
         video = build_video(fmt, meta, duration)
+        clip_audit = meta.get("visual_clip_audit", [])
         run_record.update({
             "generated": True,
             "status": "generated",
             "video_file": video.name,
             "duration_seconds": round(duration, 2),
+            "visual_clip_count": sum(item.get("matched_clip_count", 0) for item in clip_audit),
+            "visual_clip_audit": clip_audit,
         })
         save_history(hist)
     except Exception as exc:
