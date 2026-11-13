@@ -39,6 +39,12 @@
       "time": "2026-11-10T13:24:05Z",
       "format": "short",
       "title": "What If Earth Crossed a Climate Tipping Point?"
+    },
+    {
+      "time": "2026-11-13T03:40:44Z",
+      "format": "short",
+      "title": "The Hidden Wires Holding Up the Global Internet",
+      "topic": "Internet infrastructure and global connectivity"
     }
   ],
   "patterns": {},
@@ -236,6 +242,40 @@
       "platforms": {},
       "failed_stage": "script and evidence validation",
       "error": "Expecting value: line 1 column 1 (char 0)"
+    },
+    {
+      "time": "2026-11-13T03:40:44Z",
+      "github_run_id": "43360466941",
+      "github_run_attempt": "1",
+      "github_event": "schedule",
+      "format": "short",
+      "topic": "Internet infrastructure and global connectivity",
+      "status": "completed_with_delivery_issues",
+      "generated": true,
+      "platforms": {
+        "youtube": {
+          "status": "skipped",
+          "reason": "upload switch is off"
+        },
+        "facebook": {
+          "status": "skipped",
+          "reason": "publishing switch is off"
+        },
+        "instagram": {
+          "status": "skipped",
+          "reason": "publishing switch is off"
+        },
+        "tiktok": {
+          "status": "skipped",
+          "reason": "inbox upload switch is off"
+        }
+      },
+      "title": "The Hidden Wires Holding Up the Global Internet",
+      "source_count": 3,
+      "visual_scene_count": 2,
+      "video_file": "final_short.mp4",
+      "duration_seconds": 67.68,
+      "completed_at": "2026-11-13T03:51:15Z"
     }
   ]
 }
