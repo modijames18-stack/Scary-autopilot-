@@ -147,6 +147,35 @@ class VisualPlanTests(unittest.TestCase):
             [("px2", "https://cdn.example/submarine-cable.mp4", 7.0)],
         )
 
+    def test_pexels_fallback_requires_and_reads_page_subject_metadata(self):
+        api_response = Mock()
+        api_response.raise_for_status.return_value = None
+        api_response.json.return_value = {
+            "videos": [{
+                "id": 9,
+                "url": "https://www.pexels.com/video/submarine-cable-repair-123/",
+                "duration": 8,
+                "video_files": [{
+                    "file_type": "video/mp4",
+                    "width": 1280,
+                    "link": "https://videos.pexels.com/submarine-cable.mp4",
+                }],
+            }]
+        }
+        page_response = Mock(ok=True)
+        page_response.text = (
+            '<meta property="og:title" content="Underwater submarine cable repair ship ocean">'
+        )
+        with patch.dict("os.environ", {"PIXABAY_API_KEY": "", "PEXELS_API_KEY": "test-key"}, clear=True):
+            with patch("autopilot.requests.get", side_effect=[api_response, page_response]):
+                candidates = autopilot.find_candidates(
+                    ["undersea cable repair ship"], "short", 720, topic=INTERNET_TOPIC
+                )
+        self.assertEqual(
+            candidates,
+            [("pe9", "https://videos.pexels.com/submarine-cable.mp4", 8.0)],
+        )
+
     def test_parse_meta_reports_invalid_json_without_raw_response(self):
         with self.assertRaisesRegex(ValueError, "did not contain a JSON object"):
             autopilot.parse_meta("The provider returned no structured script.")
