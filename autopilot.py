@@ -482,6 +482,9 @@ TOPIC_VISUAL_ANCHORS = {
     "Air pollution and health": {
         "air", "pollution", "smog", "particulate", "emission", "monitor", "factory",
         "vehicle", "exhaust", "traffic", "industrial", "haze", "airquality",
+        # Concrete public-health and street-level visuals used in real pollution reporting.
+        "pedestrian", "mask", "street", "city", "urban", "commuter", "bus",
+        "lung", "respiratory", "medical", "health", "laboratory", "scientist", "researcher",
     },
     "Red or discolored rivers and harmful algal blooms": {
         "river", "algae", "algal", "bloom", "cyanobacteria", "lake", "runoff",
@@ -718,7 +721,7 @@ def make_visual_plan(narration, topic=None, fmt="short"):
             meaningful = tokens - GENERIC_VISUAL_TERMS
             if len(meaningful) < 1:
                 raise ValueError(f"Scene {expected} contains a generic footage search: {keyword!r}.")
-            if topic and not (tokens & scene_terms or tokens & topic_terms):
+            if topic and not (tokens & scene_terms or tokens & topic_terms or len(tokens & anchor_terms) >= 2):
                 raise ValueError(
                     f"Scene {expected} footage search does not match its narration or topic: {keyword!r}."
                 )
@@ -999,6 +1002,9 @@ def visual_tokens(value):
         "aquifers": "aquifer", "reservoirs": "reservoir", "wetlands": "wetland",
         "wells": "well", "dams": "dam", "satellites": "satellite",
         "ships": "ship", "routers": "router", "skills": "skill",
+        "pedestrians": "pedestrian", "masks": "mask", "streets": "street",
+        "commuters": "commuter", "buses": "bus", "lungs": "lung",
+        "scientists": "scientist", "researchers": "researcher", "laboratories": "laboratory",
     }
     return {
         aliases.get(token, token)

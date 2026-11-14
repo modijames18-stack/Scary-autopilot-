@@ -102,6 +102,48 @@ class VisualPlanTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "at least two concrete topic-specific anchors"):
                 autopilot.make_visual_plan(narration, topic=INTERNET_TOPIC, fmt="short")
 
+    def test_accepts_relevant_pedestrian_mask_smog_searches(self):
+        narration = (
+            "Air pollution affects people in busy streets. "
+            "Fine particles can enter the lungs. "
+            "Traffic and industry contribute to polluted air. "
+            "Air monitors measure local conditions. "
+            "Health guidance can reduce exposure. "
+            "Cleaner transport can improve city air."
+        )
+        scenes = [
+            {"index": 1, "keywords": [
+                "pedestrian wearing face mask walking through heavy city smog",
+                "commuter wearing mask beside traffic in urban air pollution",
+            ]},
+            {"index": 2, "keywords": [
+                "particulate matter entering lungs medical illustration",
+                "air pollution health research laboratory",
+            ]},
+            {"index": 3, "keywords": [
+                "vehicle exhaust on busy city street",
+                "industrial factory emissions air pollution",
+            ]},
+            {"index": 4, "keywords": [
+                "air quality monitor measuring particulate pollution",
+                "scientist checking urban air monitoring station",
+            ]},
+            {"index": 5, "keywords": [
+                "people wearing protective masks near traffic",
+                "air pollution health advice public information",
+            ]},
+            {"index": 6, "keywords": [
+                "electric buses replacing diesel city traffic",
+                "urban clean public transport street",
+            ]},
+        ]
+        with patch.object(autopilot, "ask_ai", return_value=json.dumps({"scenes": scenes})):
+            plan = autopilot.make_visual_plan(
+                narration, topic="Air pollution and health", fmt="short"
+            )
+        self.assertEqual(len(plan), 6)
+        self.assertIn("pedestrian wearing face mask", plan[0]["keywords"][0])
+
     def test_pixabay_tags_reject_cable_car_and_accept_undersea_cable(self):
         self.assertFalse(
             autopilot.stock_tags_match(
