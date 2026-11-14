@@ -393,6 +393,19 @@
       "platforms": {},
       "failed_stage": "script and evidence validation",
       "error": "Documentary narration must include a practical response or solution."
+    },
+    {
+      "time": "2026-11-14T09:33:28Z",
+      "github_run_id": "43581060035",
+      "github_run_attempt": "1",
+      "github_event": "schedule",
+      "format": "short",
+      "topic": "Red or discolored rivers and harmful algal blooms",
+      "status": "generation_failed",
+      "generated": false,
+      "platforms": {},
+      "failed_stage": "script and evidence validation",
+      "error": "Configured AI provider unavailable; safe documentary generation stopped. Gemini API request failed after bounded retries; inspect redacted workflow diagnostics."
     }
   ]
 }
