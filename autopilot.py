@@ -721,7 +721,7 @@ def make_visual_plan(narration, topic=None, fmt="short"):
             meaningful = tokens - GENERIC_VISUAL_TERMS
             if len(meaningful) < 1:
                 raise ValueError(f"Scene {expected} contains a generic footage search: {keyword!r}.")
-            if topic and not (tokens & scene_terms or tokens & topic_terms):
+            if topic and not (tokens & scene_terms or tokens & topic_terms or len(tokens & anchor_terms) >= 2):
                 raise ValueError(
                     f"Scene {expected} footage search does not match its narration or topic: {keyword!r}."
                 )
