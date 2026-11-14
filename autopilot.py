@@ -482,6 +482,8 @@ TOPIC_VISUAL_ANCHORS = {
     "Air pollution and health": {
         "air", "pollution", "smog", "particulate", "emission", "monitor", "factory",
         "vehicle", "exhaust", "traffic", "industrial", "haze", "airquality",
+        # Concrete public-health and street-level visuals used in real pollution reporting.
+        "pedestrian", "mask", "street", "city", "urban", "commuter", "bus",
     },
     "Red or discolored rivers and harmful algal blooms": {
         "river", "algae", "algal", "bloom", "cyanobacteria", "lake", "runoff",
@@ -999,6 +1001,8 @@ def visual_tokens(value):
         "aquifers": "aquifer", "reservoirs": "reservoir", "wetlands": "wetland",
         "wells": "well", "dams": "dam", "satellites": "satellite",
         "ships": "ship", "routers": "router", "skills": "skill",
+        "pedestrians": "pedestrian", "masks": "mask", "streets": "street",
+        "commuters": "commuter", "buses": "bus",
     }
     return {
         aliases.get(token, token)
