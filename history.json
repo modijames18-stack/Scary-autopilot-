@@ -380,6 +380,19 @@
       "platforms": {},
       "failed_stage": "scene planning",
       "error": "Scene 1 footage search is ambiguous; it needs at least two concrete topic-specific anchors: 'pedestrian wearing face mask walking through heavy city smog'."
+    },
+    {
+      "time": "2026-11-14T06:41:47Z",
+      "github_run_id": "43567513285",
+      "github_run_attempt": "1",
+      "github_event": "schedule",
+      "format": "short",
+      "topic": "Internet infrastructure and global connectivity",
+      "status": "generation_failed",
+      "generated": false,
+      "platforms": {},
+      "failed_stage": "script and evidence validation",
+      "error": "Documentary narration must include a practical response or solution."
     }
   ]
 }
