@@ -367,6 +367,19 @@
       "platforms": {},
       "failed_stage": "script and evidence validation",
       "error": "AI script response did not contain a JSON object; refusing to continue."
+    },
+    {
+      "time": "2026-11-14T03:38:23Z",
+      "github_run_id": "43552616437",
+      "github_run_attempt": "1",
+      "github_event": "schedule",
+      "format": "short",
+      "topic": "Air pollution and health",
+      "status": "generation_failed",
+      "generated": false,
+      "platforms": {},
+      "failed_stage": "scene planning",
+      "error": "Scene 1 footage search is ambiguous; it needs at least two concrete topic-specific anchors: 'pedestrian wearing face mask walking through heavy city smog'."
     }
   ]
 }
