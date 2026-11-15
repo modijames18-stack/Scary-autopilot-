@@ -41,7 +41,7 @@ def good_ai_meta():
         "keeping pace with AI capabilities. "
         "FORECAST: If AI deployment spreads faster than oversight, concentrated control of data and "
         "computing could increase the influence of a small number of firms, although outcomes depend "
-        "on regulation, competition and public accountability. "
+        "on regulation, competition, public accountability and local democratic oversight. "
         "WHAT-IF: Imagine a hypothetical future in which a few providers control critical AI systems; "
         "communities might struggle to challenge automated decisions, but this scenario is not an "
         "established event. "
@@ -77,7 +77,7 @@ class DocumentaryQualityTests(unittest.TestCase):
     def test_ai_fact_rejects_vague_attribution_without_named_institution(self):
         meta = good_ai_meta()
         meta["narration"] = meta["narration"].replace(
-            "The UN's Independent International Scientific Panel on AI", "Researchers"
+            "The UN's Independent International Scientific Panel on AI", "Independent private research groups and academic experts"
         )
         with self.assertRaisesRegex(ValueError, "institution from the matching evidence catalogue"):
             autopilot.validate_documentary_script(
