@@ -34,11 +34,55 @@ def good_meta():
     }
 
 
+def good_ai_meta():
+    narration = (
+        "FACT: The UN's Independent International Scientific Panel on AI describes risks across "
+        "economic, social, security and human-rights domains, and warns that safeguards may not be "
+        "keeping pace with AI capabilities. "
+        "FORECAST: If AI deployment spreads faster than oversight, concentrated control of data and "
+        "computing could increase the influence of a small number of firms, although outcomes depend "
+        "on regulation, competition and public accountability. "
+        "WHAT-IF: Imagine a hypothetical future in which a few providers control critical AI systems; "
+        "communities might struggle to challenge automated decisions, but this scenario is not an "
+        "established event. "
+        "Public institutions can fund independent research, strengthen transparent rules, support "
+        "competition and share oversight across borders. "
+        "Which safeguard should be strengthened first?"
+    )
+    return {
+        "topic": "Global AI governance and concentration of power",
+        "title": "Who Sets the Rules for AI?",
+        "description": "An evidence-led look at international AI governance and concentration risks.",
+        "narration": narration,
+        "sources": [
+            {"title": "UN AI Panel", "url": "https://www.un.org/independent-international-scientific-panel-ai/en/preliminary-report"},
+            {"title": "UN AI Governance", "url": "https://www.un.org/en/global-issues/artificial-intelligence"},
+        ],
+    }
+
+
 class DocumentaryQualityTests(unittest.TestCase):
     def test_accepts_labeled_short_documentary(self):
         meta = good_meta()
         result = autopilot.validate_documentary_script(meta, TOPIC, "short")
         self.assertIs(result, meta)
+
+    def test_ai_fact_accepts_formal_un_panel_name_with_possessive(self):
+        meta = good_ai_meta()
+        result = autopilot.validate_documentary_script(
+            meta, "Global AI governance and concentration of power", "short"
+        )
+        self.assertIs(result, meta)
+
+    def test_ai_fact_rejects_vague_attribution_without_named_institution(self):
+        meta = good_ai_meta()
+        meta["narration"] = meta["narration"].replace(
+            "The UN's Independent International Scientific Panel on AI", "Researchers"
+        )
+        with self.assertRaisesRegex(ValueError, "institution from the matching evidence catalogue"):
+            autopilot.validate_documentary_script(
+                meta, "Global AI governance and concentration of power", "short"
+            )
 
     def test_rejects_topic_drift(self):
         meta = good_meta()
