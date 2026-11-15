@@ -458,6 +458,19 @@
       "platforms": {},
       "failed_stage": "script and evidence validation",
       "error": "AI script response did not contain a JSON object; refusing to continue."
+    },
+    {
+      "time": "2026-11-15T00:32:53Z",
+      "github_run_id": "43658630772",
+      "github_run_attempt": "1",
+      "github_event": "schedule",
+      "format": "short",
+      "topic": "Ocean warming, sea-level rise and glacier loss",
+      "status": "generation_failed",
+      "generated": false,
+      "platforms": {},
+      "failed_stage": "script and evidence validation",
+      "error": "AI script response did not contain a JSON object; refusing to continue."
     }
   ]
 }
