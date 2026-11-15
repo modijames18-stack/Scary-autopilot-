@@ -372,6 +372,8 @@ TOPIC_FACT_ATTRIBUTIONS = {
     "AI and jobs": (r"\bILO\b", r"\bInternational Labour Organization\b"),
     "Global AI governance and concentration of power": (
         r"\bUnited Nations\b", r"\bUN Global Risk Report\b", r"\bUN (?:scientific )?panel\b",
+        r"\bUN(?:'s|’s)\s+Independent International Scientific Panel on AI\b",
+        r"\bIndependent International Scientific Panel on AI\b",
     ),
     "Power-grid resilience and worldwide blackout scenarios": (
         r"\bIEA\b", r"\bInternational Energy Agency\b",
@@ -582,7 +584,7 @@ Investigative documentary rules (mandatory):
 - Build a clear investigation: what is happening now; what reliable evidence shows; what experts
   disagree about; what could plausibly happen next; who would be affected; and what solutions exist.
 - The narration MUST use three clearly separated spoken labels: "FACT:", "FORECAST:", and "WHAT-IF:".
-  FACT contains only documented evidence from the matching catalogue topic and explicitly names an\n  institution from that topic's catalogue. FORECAST describes a
+  FACT contains only documented evidence from the matching catalogue topic and explicitly names an\n  institution from that topic's catalogue. For AI governance, name the UN's Independent International\n  Scientific Panel on AI or the United Nations explicitly; vague phrases such as 'experts say' are not attribution. FORECAST describes a
   credible, qualified future risk and its uncertainty. WHAT-IF is explicitly hypothetical and must
   never be presented as an event that has happened or a prediction that is certain.
 - Use specific, checkable evidence. Never invent statistics, studies, report titles, quotations,
