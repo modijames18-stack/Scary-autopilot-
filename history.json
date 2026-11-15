@@ -471,6 +471,19 @@
       "platforms": {},
       "failed_stage": "script and evidence validation",
       "error": "AI script response did not contain a JSON object; refusing to continue."
+    },
+    {
+      "time": "2026-11-15T03:40:34Z",
+      "github_run_id": "43673384024",
+      "github_run_attempt": "1",
+      "github_event": "schedule",
+      "format": "short",
+      "topic": "Global AI governance and concentration of power",
+      "status": "generation_failed",
+      "generated": false,
+      "platforms": {},
+      "failed_stage": "script and evidence validation",
+      "error": "FACT section must explicitly attribute a documented claim to an institution from the matching evidence catalogue."
     }
   ]
 }
