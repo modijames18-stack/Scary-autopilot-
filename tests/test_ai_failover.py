@@ -21,13 +21,13 @@ class GeminiFailoverTests(unittest.TestCase):
     def test_primary_timeout_falls_back_to_secondary_model(self, post, _sleep):
         success = Mock(ok=True, status_code=200)
         success.json.return_value = {
-            "candidates": [{"content": {"parts": [{"text": "validated candidate"}]}}]
+            "candidates": [{"content": {"parts": [{"text": "{\"validated\": true}"}]}}]
         }
         post.side_effect = [requests.Timeout("primary timed out"), success]
 
         result = autopilot.ask_ai("system", "prompt", max_tokens=300, json_mode=True)
 
-        self.assertEqual(result, "validated candidate")
+        self.assertEqual(result, "{\"validated\": true}")
         self.assertEqual(post.call_count, 2)
         self.assertIn("gemini-primary:generateContent", post.call_args_list[0].args[0])
         self.assertIn("gemini-fallback:generateContent", post.call_args_list[1].args[0])
