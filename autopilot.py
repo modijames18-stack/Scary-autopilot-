@@ -287,6 +287,19 @@ def ask_ai(system, prompt, max_tokens=4000, json_mode=False):
                 part.get("text", "") for part in parts if not part.get("thought")
             )
             if generated.strip():
+                if json_mode:
+                    start, end = generated.find("{"), generated.rfind("}")
+                    try:
+                        parsed = json.loads(generated[start:end + 1]) if start >= 0 and end > start else None
+                    except (json.JSONDecodeError, TypeError):
+                        parsed = None
+                    if not isinstance(parsed, dict):
+                        failures.append(f"{model}: non-JSON response")
+                        print(
+                            f"Gemini {model} returned a non-JSON response; "
+                            "trying the next configured model."
+                        )
+                        break
                 return generated
             failures.append(f"{model}: empty response")
             break

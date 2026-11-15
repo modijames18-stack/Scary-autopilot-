@@ -21,13 +21,13 @@ class GeminiFailoverTests(unittest.TestCase):
     def test_primary_timeout_falls_back_to_secondary_model(self, post, _sleep):
         success = Mock(ok=True, status_code=200)
         success.json.return_value = {
-            "candidates": [{"content": {"parts": [{"text": "validated candidate"}]}}]
+            "candidates": [{"content": {"parts": [{"text": "{\"validated\": true}"}]}}]
         }
         post.side_effect = [requests.Timeout("primary timed out"), success]
 
         result = autopilot.ask_ai("system", "prompt", max_tokens=300, json_mode=True)
 
-        self.assertEqual(result, "validated candidate")
+        self.assertEqual(result, "{\"validated\": true}")
         self.assertEqual(post.call_count, 2)
         self.assertIn("gemini-primary:generateContent", post.call_args_list[0].args[0])
         self.assertIn("gemini-fallback:generateContent", post.call_args_list[1].args[0])
@@ -35,6 +35,52 @@ class GeminiFailoverTests(unittest.TestCase):
         generation = post.call_args_list[0].kwargs["json"]["generationConfig"]
         self.assertEqual(generation["maxOutputTokens"], 512)
         self.assertEqual(generation["responseMimeType"], "application/json")
+
+    @patch.dict("os.environ", {
+        "AI_PROVIDER": "gemini",
+        "GEMINI_API_KEY": "test-key",
+        "GEMINI_MODEL": "gemini-primary",
+        "GEMINI_FALLBACK_MODELS": "gemini-fallback",
+        "GEMINI_ATTEMPTS_PER_MODEL": "1",
+    }, clear=True)
+    @patch("autopilot.requests.post")
+    def test_non_json_primary_response_uses_configured_fallback(self, post):
+        malformed = Mock(ok=True, status_code=200)
+        malformed.json.return_value = {
+            "candidates": [{"content": {"parts": [{"text": "Here is a summary, not JSON."}]}}]
+        }
+        valid = Mock(ok=True, status_code=200)
+        valid.json.return_value = {
+            "candidates": [{"content": {"parts": [{"text": '{"topic": "Water"}'}]}}]
+        }
+        post.side_effect = [malformed, valid]
+
+        result = autopilot.ask_ai("system", "prompt", json_mode=True)
+
+        self.assertEqual(result, '{"topic": "Water"}')
+        self.assertEqual(post.call_count, 2)
+        self.assertIn("gemini-primary:generateContent", post.call_args_list[0].args[0])
+        self.assertIn("gemini-fallback:generateContent", post.call_args_list[1].args[0])
+
+    @patch.dict("os.environ", {
+        "AI_PROVIDER": "gemini",
+        "GEMINI_API_KEY": "test-key",
+        "GEMINI_MODEL": "gemini-primary",
+        "GEMINI_FALLBACK_MODELS": "gemini-fallback",
+        "GEMINI_ATTEMPTS_PER_MODEL": "1",
+    }, clear=True)
+    @patch("autopilot.requests.post")
+    def test_all_non_json_models_fail_closed(self, post):
+        malformed = Mock(ok=True, status_code=200)
+        malformed.json.return_value = {
+            "candidates": [{"content": {"parts": [{"text": "No structured response."}]}}]
+        }
+        post.side_effect = [malformed, malformed]
+
+        with self.assertRaisesRegex(RuntimeError, "non-JSON response"):
+            autopilot.ask_ai("system", "prompt", json_mode=True)
+
+        self.assertEqual(post.call_count, 2)
 
     @patch.dict("os.environ", {
         "AI_PROVIDER": "gemini",
