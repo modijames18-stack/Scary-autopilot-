@@ -562,7 +562,7 @@ def write_script(fmt, patterns, hist, topic=None, include_visual_plan=True):
     if fmt == "short":
         spec = ("A SHORT vertical explainer, 120-150 spoken words, about 50 seconds. "
                 "Open with a gripping question or plausible scenario. Explain one real risk "
-                "and end with one practical solution plus a question for viewers.")
+                "and end with a clearly labeled SOLUTIONS section containing 2-3 concrete actions plus a thoughtful question for viewers.")
     else:
         spec = ("A LONG documentary, 900-1200 spoken words, about 6-8 minutes. "
                 "Use a strong hook, clear sections, real-world evidence, competing viewpoints, "
@@ -596,7 +596,7 @@ Investigative documentary rules (mandatory):
   fake emergency broadcast, fictional town, or fabricated eyewitness.
 - Build a clear investigation: what is happening now; what reliable evidence shows; what experts
   disagree about; what could plausibly happen next; who would be affected; and what solutions exist.
-- The narration MUST use three clearly separated spoken labels: "FACT:", "FORECAST:", and "WHAT-IF:".
+- The narration MUST use four clearly separated spoken labels in this order: "FACT:", "FORECAST:", "WHAT-IF:", and "SOLUTIONS:".
   FACT contains only documented evidence from the matching catalogue topic and explicitly names an\n  institution from that topic's catalogue. For AI governance, name the UN's Independent International\n  Scientific Panel on AI or the United Nations explicitly; vague phrases such as 'experts say' are not attribution. FORECAST describes a
   credible, qualified future risk and its uncertainty. WHAT-IF is explicitly hypothetical and must
   never be presented as an event that has happened or a prediction that is certain.
@@ -608,7 +608,7 @@ Investigative documentary rules (mandatory):
   is certain or that a worst-case scenario is inevitable.
 - Use serious, confident, human narration; cinematic pacing, meaningful pauses, and suspense created
   by evidence and unanswered questions—not fake scares, gore, or exaggerated claims.
-- End with practical responses and make the final spoken sentence a thoughtful viewer question ending in a question mark. Do not place a sign-off or any text after it.
+- Include a dedicated spoken "SOLUTIONS:" section after WHAT-IF. It must name at least two concrete, feasible actions and keep them grounded in the evidence. Make the final spoken sentence a thoughtful viewer question ending in a question mark. Do not place a sign-off or any text after it.
 - Visual search phrases must describe authentic documentary footage relevant to each section:
   real workplaces, workers, data centres, power grids, reservoirs, rivers, farms, laboratories,
   scientific fieldwork, public infrastructure, and affected communities. Never request haunted-house
@@ -640,7 +640,7 @@ Reply with ONLY a JSON object with these keys:
                 "Improve this short investigative documentary script. Keep it evidence-led, never "
                 "turn it into fictional horror. Preserve real source entries and all supported facts; "
                 "do not add unsupported claims or invent sources. Strengthen the hook, keep it balanced, "
-                "120-150 words, and end with a practical response and question. Clearly label hypotheticals. "
+                "120-150 words. Preserve the exact FACT, FORECAST, WHAT-IF, and SOLUTIONS labels in that order; make SOLUTIONS name at least two concrete actions. Clearly label hypotheticals. "
                 "Reply with ONLY the same JSON object (same keys).\n\n" + json.dumps(meta),
                 max_tokens=1200, json_mode=True,
             )
@@ -836,6 +836,7 @@ def validate_documentary_script(meta, expected_topic, fmt):
         "FACT": r"\bFACT\s*:",
         "FORECAST": r"\bFORECAST\s*:",
         "WHAT-IF": r"\bWHAT[- ]IF\s*:",
+        "SOLUTIONS": r"\bSOLUTIONS\s*:",
     }
     matches = {label: re.search(pattern, narration, flags=re.IGNORECASE)
                for label, pattern in label_patterns.items()}
@@ -845,7 +846,7 @@ def validate_documentary_script(meta, expected_topic, fmt):
             "Documentary narration must clearly separate FACT, FORECAST, and WHAT-IF; "
             f"missing labels: {', '.join(missing)}."
         )
-    positions = [matches[label].start() for label in ("FACT", "FORECAST", "WHAT-IF")]
+    positions = [matches[label].start() for label in ("FACT", "FORECAST", "WHAT-IF", "SOLUTIONS")]
     if positions != sorted(positions):
         raise ValueError("FACT, FORECAST and WHAT-IF sections must appear in that order.")
     if len(re.findall(r"\b[\w’'-]+\b", narration[:positions[0]])) > 24:
@@ -853,7 +854,8 @@ def validate_documentary_script(meta, expected_topic, fmt):
 
     fact = narration[matches["FACT"].end():matches["FORECAST"].start()].strip()
     forecast = narration[matches["FORECAST"].end():matches["WHAT-IF"].start()].strip()
-    what_if = narration[matches["WHAT-IF"].end():].strip()
+    what_if = narration[matches["WHAT-IF"].end():matches["SOLUTIONS"].start()].strip()
+    solutions = narration[matches["SOLUTIONS"].end():].strip()
 
     institutions = TOPIC_FACT_ATTRIBUTIONS.get(expected_topic, ())
     if not institutions or not any(re.search(pattern, fact, re.IGNORECASE) for pattern in institutions):
@@ -873,13 +875,24 @@ def validate_documentary_script(meta, expected_topic, fmt):
     if not re.search(r"\b(?:if|imagine|hypothetical|scenario)\b", what_if, re.IGNORECASE):
         raise ValueError("WHAT-IF section must explicitly identify its scenario as hypothetical.")
 
-    if not re.search(
-        r"\b(?:conserve|repair|protect|restore|monitor|prepare|adapt|invest|reduce|improve|"
-        r"strengthen|regulate|train|reskill|plan|share|upgrade|maintain|diversify|transition|"
-        r"build|switch|fund|recycle|support)\b",
-        " ".join(narration.split()[-70:]), re.IGNORECASE,
-    ):
-        raise ValueError("Documentary narration must include a practical response or solution.")
+    # Validate the dedicated response section, not an arbitrary keyword near the end.
+    # Exclude the final viewer question so it cannot satisfy the action requirement.
+    solution_body = re.sub(r"\s*[^.!?]*\?\s*$", "", solutions).strip()
+    action_verbs = re.findall(
+        r"\b(?:conserv\w*|repair\w*|protect\w*|restor\w*|monitor\w*|prepar\w*|"
+        r"adapt\w*|invest\w*|reduc\w*|improv\w*|strengthen\w*|regulat\w*|train\w*|"
+        r"reskill\w*|plan\w*|shar\w*|upgrad\w*|maintain\w*|diversif\w*|transition\w*|"
+        r"build\w*|switch\w*|fund\w*|recycl\w*|support\w*|inspect\w*|replac\w*|"
+        r"install\w*|enforc\w*|expand\w*|measur\w*|test\w*|treat\w*|reuse\w*|"
+        r"educat\w*|coordinat\w*|audit\w*|implement\w*|prioriti\w*|disclos\w*|"
+        r"verify\w*|safeguard\w*|limit\w*)\b",
+        solution_body, re.IGNORECASE,
+    )
+    if len({verb.lower() for verb in action_verbs}) < 2:
+        raise ValueError(
+            "SOLUTIONS section must name at least two concrete actions, such as "
+            "conserving, repairing, monitoring, funding, regulating, training, or restoring."
+        )
     if not narration.endswith("?"):
         raise ValueError("Documentary narration must end with a thoughtful viewer question.")
     if len(meta.get("sources", [])) < 2:
