@@ -20,7 +20,7 @@ def good_meta():
         "for drinking water, food production and healthy rivers; the scale depends on local management, "
         "rainfall and investment. WHAT-IF: Imagine a basin where groundwater is pumped faster than rain can "
         "replace it. Wells could fail, harvests could shrink and families might pay more, but this is a "
-        "scenario, not a claim about every river. Communities can conserve water, repair leaking pipes, "
+        "scenario, not a claim about every river. SOLUTIONS: Communities can conserve water, repair leaking pipes, "
         "protect wetlands, monitor aquifers and plan fair sharing before a crisis grows. "
         "Which action should leaders fund first?"
     )
@@ -45,7 +45,7 @@ def good_ai_meta():
         "WHAT-IF: Imagine a hypothetical future in which a few providers control critical AI systems; "
         "communities might struggle to challenge automated decisions, but this scenario is not an "
         "established event. "
-        "Public institutions can fund independent research, strengthen transparent rules, support "
+        "SOLUTIONS: Public institutions can fund independent research, strengthen transparent rules, support "
         "competition and share oversight across borders. "
         "Which safeguard should be strengthened first?"
     )
@@ -88,6 +88,23 @@ class DocumentaryQualityTests(unittest.TestCase):
         meta = good_meta()
         meta["topic"] = "AI and jobs"
         with self.assertRaisesRegex(ValueError, "topic drift"):
+            autopilot.validate_documentary_script(meta, TOPIC, "short")
+
+    def test_rejects_missing_solutions_label(self):
+        meta = good_meta()
+        meta["narration"] = meta["narration"].replace("SOLUTIONS:", "RESPONSE:")
+        with self.assertRaisesRegex(ValueError, "missing labels: SOLUTIONS"):
+            autopilot.validate_documentary_script(meta, TOPIC, "short")
+
+    def test_requires_two_concrete_actions_inside_solutions_section(self):
+        meta = good_meta()
+        meta["narration"] = meta["narration"].replace(
+            "SOLUTIONS: Communities can conserve water, repair leaking pipes, protect wetlands, "
+            "monitor aquifers and plan fair sharing before a crisis grows.",
+            "SOLUTIONS: Communities can discuss the issue and consider possible improvements "
+            "before a crisis grows.",
+        )
+        with self.assertRaisesRegex(ValueError, "at least two concrete actions"):
             autopilot.validate_documentary_script(meta, TOPIC, "short")
 
     def test_rejects_missing_fact_forecast_or_what_if_label(self):
