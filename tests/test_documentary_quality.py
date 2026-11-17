@@ -113,6 +113,36 @@ class DocumentaryQualityTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "missing labels"):
             autopilot.validate_documentary_script(meta, TOPIC, "short")
 
+    def test_forecast_accepts_likely_as_an_uncertainty_qualifier(self):
+        meta = good_meta()
+        meta["narration"] = meta["narration"].replace(
+            "some regions may face harder competition",
+            "some regions are likely to face harder competition",
+        )
+        autopilot.validate_documentary_script(meta, TOPIC, "short")
+
+    def test_forecast_accepts_not_inevitable_and_will_depend_on(self):
+        meta = good_meta()
+        meta["narration"] = meta["narration"].replace(
+            "some regions may face harder competition for drinking water, food production "
+            "and healthy rivers; the scale depends on local management, rainfall and investment.",
+            "harder competition is not inevitable and will depend on local management, rainfall "
+            "and investment across drinking water, food production and healthy rivers.",
+        )
+        autopilot.validate_documentary_script(meta, TOPIC, "short")
+
+    def test_forecast_rejects_an_unqualified_certain_outcome(self):
+        meta = good_meta()
+        meta["narration"] = meta["narration"].replace(
+            "If demand keeps rising and dry periods intensify, some regions may face harder "
+            "competition for drinking water, food production and healthy rivers; the scale "
+            "depends on local management, rainfall and investment.",
+            "Dry periods will force every river basin into severe competition for drinking "
+            "water, food production and healthy rivers by 2030.",
+        )
+        with self.assertRaisesRegex(ValueError, "qualify uncertainty"):
+            autopilot.validate_documentary_script(meta, TOPIC, "short")
+
     def test_rejects_short_script_outside_word_range(self):
         meta = good_meta()
         meta["narration"] = "FACT: Evidence. FORECAST: Risk. WHAT-IF: Hypothetical. What now?"

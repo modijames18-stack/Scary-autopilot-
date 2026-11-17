@@ -598,7 +598,7 @@ Investigative documentary rules (mandatory):
   disagree about; what could plausibly happen next; who would be affected; and what solutions exist.
 - The narration MUST use four clearly separated spoken labels in this order: "FACT:", "FORECAST:", "WHAT-IF:", and "SOLUTIONS:".
   FACT contains only documented evidence from the matching catalogue topic and explicitly names an\n  institution from that topic's catalogue. For AI governance, name the UN's Independent International\n  Scientific Panel on AI or the United Nations explicitly; vague phrases such as 'experts say' are not attribution. FORECAST describes a
-  credible, qualified future risk and its uncertainty. WHAT-IF is explicitly hypothetical and must
+  credible, qualified future risk and its uncertainty; include an explicit qualifier such as "likely", "unlikely", "could", "may", "might", "depends on", "not inevitable", "not guaranteed", or "under some scenarios". WHAT-IF is explicitly hypothetical and must
   never be presented as an event that has happened or a prediction that is certain.
 - Use specific, checkable evidence. Never invent statistics, studies, report titles, quotations,
   experts, dates, or source URLs. If a precise claim cannot be supported, omit it or qualify it.
@@ -868,7 +868,11 @@ def validate_documentary_script(meta, expected_topic, fmt):
         raise ValueError("FACT section does not contain a clear factual claim about the selected topic.")
     if not re.search(
         r"\b(?:could|may|might|possible|possibly|potential|risk|projected|projection|"
-        r"forecast|uncertain|uncertainty|depends|depending|under certain conditions)\b",
+        r"forecast|uncertain|uncertainty|depend(?:s|ing)?|likely|unlikely|"
+        r"not inevitable|not guaranteed|not certain|not assured|not predetermined|"
+        r"conditional|contingent|under certain conditions|under some scenarios|"
+        r"is expected to|are expected to|expected to|is forecast to|are forecast to|"
+        r"varies with|range of outcomes)\b",
         forecast, re.IGNORECASE,
     ):
         raise ValueError("FORECAST section must qualify uncertainty rather than state certainty.")
