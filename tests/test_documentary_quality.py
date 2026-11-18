@@ -107,6 +107,17 @@ class DocumentaryQualityTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "at least two concrete actions"):
             autopilot.validate_documentary_script(meta, TOPIC, "short")
 
+
+    def test_solution_validator_accepts_establish_publish_and_provide_actions(self):
+        meta = good_meta()
+        meta["narration"] = meta["narration"].replace(
+            "Communities can conserve water, repair leaking pipes, protect wetlands, "
+            "monitor aquifers and plan fair sharing before a crisis grows.",
+            "Local agencies can establish water-sharing agreements, publish transparent river data "
+            "and provide drought training.",
+        )
+        autopilot.validate_documentary_script(meta, TOPIC, "short")
+
     def test_rejects_missing_fact_forecast_or_what_if_label(self):
         meta = good_meta()
         meta["narration"] = meta["narration"].replace("WHAT-IF:", "SCENARIO:")

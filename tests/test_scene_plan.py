@@ -144,6 +144,38 @@ class VisualPlanTests(unittest.TestCase):
         self.assertEqual(len(plan), 6)
         self.assertIn("pedestrian wearing face mask", plan[0]["keywords"][0])
 
+
+    def test_red_river_blood_metaphor_is_normalized_to_neutral_scientific_search(self):
+        narration = (
+            "NOAA explains harmful algal blooms can discolor river water. "
+            "Cyanobacteria blooms can produce toxins in lakes. "
+            "Nutrient runoff can trigger rapid algae growth. "
+            "Scientists collect water samples and examine them under microscopes. "
+            "Wildlife can be harmed when oxygen levels fall. "
+            "Monitoring and reducing nutrient pollution can protect river ecosystems."
+        )
+        scenes = [
+            {"index": 1, "keywords": ["blood red river water aerial", "river water sampling scientist"]},
+            {"index": 2, "keywords": ["cyanobacteria bloom lake water testing", "algal bloom lake water sample"]},
+            {"index": 3, "keywords": ["nutrient runoff river algae bloom", "algal bloom water nutrient testing"]},
+            {"index": 4, "keywords": ["scientist water sampling microscope", "river water testing scientist"]},
+            {"index": 5, "keywords": ["fish wildlife water sampling algal bloom", "lake water cyanobacteria testing"]},
+            {"index": 6, "keywords": ["river water quality monitoring nutrient runoff", "algal bloom prevention river water testing"]},
+        ]
+        with patch.object(autopilot, "ask_ai", return_value=json.dumps({"scenes": scenes})):
+            plan = autopilot.make_visual_plan(
+                narration, topic="Red or discolored rivers and harmful algal blooms", fmt="short"
+            )
+        self.assertEqual(len(plan), 6)
+        self.assertEqual(plan[0]["keywords"][0], "red-discolored river water aerial")
+
+    def test_blood_word_remains_rejected_for_unrelated_topics(self):
+        scenes = water_scenes()
+        scenes[0] = {"index": 1, "keywords": ["blood red river water aerial", "drought affected river basin"]}
+        with patch.object(autopilot, "ask_ai", return_value=json.dumps({"scenes": scenes})):
+            with self.assertRaisesRegex(ValueError, "fictional or horror footage"):
+                autopilot.make_visual_plan(water_narration(), topic=WATER_TOPIC, fmt="short")
+
     def test_pixabay_tags_reject_cable_car_and_accept_undersea_cable(self):
         self.assertFalse(
             autopilot.stock_tags_match(

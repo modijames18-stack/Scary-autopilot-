@@ -513,6 +513,16 @@ BANNED_VISUAL_PATTERN = re.compile(
     r"mysterious door|no reflection|ghost train|phone ringing)\b",
     re.IGNORECASE,
 )
+
+def normalize_visual_search_keyword(keyword, topic):
+    """Replace a blood metaphor with neutral scientific wording only for river-discoloration searches."""
+    value = str(keyword).strip()
+    if (
+        topic == "Red or discolored rivers and harmful algal blooms"
+        and re.search(r"\b(?:river|water|lake|algal|bloom)\b", value, re.IGNORECASE)
+    ):
+        value = re.sub(r"\bblood[-\s]+red\b", "red-discolored", value, flags=re.IGNORECASE)
+    return value
 GENERIC_VISUAL_TERMS = {
     "nature", "people", "city", "landscape", "footage", "video", "cinematic",
     "background", "scenery", "beautiful", "dark", "forest", "building",
@@ -686,7 +696,9 @@ def make_visual_plan(narration, topic=None, fmt="short"):
         "instruments. Every phrase must contain at least TWO concrete visual anchors for the "
         f"topic {topic!r}; do not rely on ambiguous words such as 'cable', 'network', 'data', "
         "'global', 'service' or 'technology' by themselves. Include at least one detail from "
-        "the narration segment. Keep the same order and number of scenes. If a claim is "
+        "the narration segment. For red/discolored-river topics, use neutral scientific wording "
+        "such as 'red-discolored river water', 'algal bloom' or 'water sampling'; never use "
+        "blood metaphors or imply literal blood. Keep the same order and number of scenes. If a claim is "
         "hypothetical, use clearly illustrative real-world subject footage, never fake news "
         "imagery. Return ONLY JSON: "
         '{"scenes":[{"index":1,"keywords":["...","..."]}]}\n\n' + numbered,
@@ -721,7 +733,10 @@ def make_visual_plan(narration, topic=None, fmt="short"):
     for expected, item in enumerate(scenes, 1):
         if not isinstance(item, dict) or item.get("index") != expected or not isinstance(item.get("keywords"), list):
             raise ValueError("AI footage plan has missing or out-of-order scene indexes.")
-        keywords = [str(k).strip() for k in item["keywords"] if str(k).strip()][:4]
+        keywords = [
+            normalize_visual_search_keyword(k, topic)
+            for k in item["keywords"] if str(k).strip()
+        ][:4]
         if len(keywords) < 2:
             raise ValueError(f"Scene {expected} has too few specific footage searches.")
 
@@ -889,7 +904,11 @@ def validate_documentary_script(meta, expected_topic, fmt):
         r"build\w*|switch\w*|fund\w*|recycl\w*|support\w*|inspect\w*|replac\w*|"
         r"install\w*|enforc\w*|expand\w*|measur\w*|test\w*|treat\w*|reuse\w*|"
         r"educat\w*|coordinat\w*|audit\w*|implement\w*|prioriti\w*|disclos\w*|"
-        r"verify\w*|safeguard\w*|limit\w*)\b",
+        r"verify\w*|safeguard\w*|limit\w*|establish\w*|publish\w*|provid\w*|"
+        r"creat\w*|enabl\w*|requir\w*|consult\w*|assess\w*|evaluat\w*|"
+        r"document\w*|track\w*|decentraliz\w*|adopt\w*|deploy\w*|compensat\w*|"
+        r"negotiat\w*|electrif\w*|retrofit\w*|moderniz\w*|phase\w*|cut\w*|"
+        r"report\w*|engag\w*|participat\w*)\b",
         solution_body, re.IGNORECASE,
     )
     if len({verb.lower() for verb in action_verbs}) < 2:
