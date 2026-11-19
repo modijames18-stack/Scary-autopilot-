@@ -7,6 +7,35 @@ from pathlib import Path
 
 HISTORY_FILE = Path(__file__).resolve().with_name("history.json")
 
+# Workflow step outcomes let the history explain where a scheduled attempt stopped,
+# even when the autopilot never started and could not write its own run record.
+STEP_FAILURES = (
+    ("MEDIA_TOOLS_OUTCOME", "runner media-tool installation",
+     "FFmpeg/font setup failed before video generation."),
+    ("PYTHON_PACKAGES_OUTCOME", "Python dependency installation",
+     "Python package installation failed before validation."),
+    ("PYTHON_SYNTAX_OUTCOME", "Python syntax validation",
+     "Python syntax validation failed before generation."),
+    ("UNIT_TESTS_OUTCOME", "automated unit tests",
+     "Automated unit tests failed before generation."),
+    ("PREFLIGHT_OUTCOME", "platform configuration preflight",
+     "Platform configuration preflight failed before generation."),
+    ("AUTOPILOT_OUTCOME", "autopilot generation or delivery",
+     "The autopilot generation or delivery step failed."),
+)
+
+
+def workflow_failure_details(environ):
+    """Return the first failed/cancelled workflow stage without exposing environment values."""
+    for variable, stage, message in STEP_FAILURES:
+        outcome = str(environ.get(variable, "")).strip().lower()
+        if outcome in ("failure", "cancelled"):
+            return stage, message
+    return (
+        "workflow setup or preflight",
+        "The scheduled workflow ended before the autopilot created a generation record.",
+    )
+
 
 def record_workflow_outcome(environ=None, history_file=None):
     """Record missed scheduled runs and terminalize interrupted run records without secrets."""
@@ -57,11 +86,13 @@ def record_workflow_outcome(environ=None, history_file=None):
                 existing["status"] = "workflow_completed_without_terminal_status"
             else:
                 return False
-            existing["workflow_status"] = job_status
-            existing["failed_stage"] = existing.get("failed_stage") or "workflow execution"
+            detected_stage, detected_error = workflow_failure_details(e)
+            existing["failed_stage"] = existing.get("failed_stage") or detected_stage
             existing["error"] = (
-                "GitHub Actions ended before the autopilot could persist a terminal run status."
+                detected_error if job_status in ("failure", "cancelled")
+                else "GitHub Actions completed before the autopilot persisted a terminal run status."
             )
+            existing["workflow_status"] = job_status
             existing["completed_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
             history["runs"] = history["runs"][-500:]
             path.write_text(json.dumps(history, indent=2), encoding="utf-8")
@@ -71,12 +102,17 @@ def record_workflow_outcome(environ=None, history_file=None):
 
     if job_status == "cancelled":
         status = "workflow_cancelled_before_generation"
+        failed_stage, error = workflow_failure_details(e)
     elif job_status == "failure":
         status = "workflow_failed_before_generation"
+        failed_stage, error = workflow_failure_details(e)
     elif job_status == "success":
         status = "workflow_completed_without_generation_record"
+        failed_stage = "generation record"
+        error = "The workflow completed without creating a generation record."
     else:
         status = "workflow_ended_without_generation_record"
+        failed_stage, error = workflow_failure_details(e)
 
     history["runs"].append({
         "time": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -88,16 +124,14 @@ def record_workflow_outcome(environ=None, history_file=None):
         "status": status,
         "generated": False,
         "workflow_status": job_status,
-        "failed_stage": "workflow setup or preflight",
-        "error": (
-            "The scheduled workflow ended before the autopilot created a generation record."
-        ),
+        "failed_stage": failed_stage,
+        "error": error,
         "platforms": {},
     })
     history["posts"] = history["posts"][-500:]
     history["runs"] = history["runs"][-500:]
     path.write_text(json.dumps(history, indent=2), encoding="utf-8")
-    print("Recorded scheduled workflow outcome:", run_id, status)
+    print("Recorded scheduled workflow outcome:", run_id, status, failed_stage)
     return True
 
 
