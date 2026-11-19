@@ -902,6 +902,19 @@
       "failed_stage": "workflow setup or preflight",
       "error": "The scheduled workflow ended before the autopilot created a generation record.",
       "platforms": {}
+    },
+    {
+      "time": "2026-11-19T10:25:57Z",
+      "github_run_id": "44505108781",
+      "github_run_attempt": "1",
+      "github_event": "schedule",
+      "format": "short",
+      "topic": "Water scarcity and drying rivers",
+      "status": "generation_failed",
+      "generated": false,
+      "platforms": {},
+      "failed_stage": "scene planning",
+      "error": "Scene 1 footage search is ambiguous; it needs at least two concrete topic-specific anchors: 'dry riverbed cracked earth ocean delta'."
     }
   ]
 }
