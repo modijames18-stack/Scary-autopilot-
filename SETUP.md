@@ -1,6 +1,6 @@
 # Scary Autopilot — four-platform publishing
 
-The scheduled workflow runs every three hours (eight runs per day). Each scheduled run creates one original vertical short documentary and attempts delivery to all four connected destinations: YouTube Shorts, Facebook Reels, Instagram Reels, and TikTok inbox.
+The scheduled workflow runs every three hours at minute 17 UTC (eight scheduled attempts per day). The offset avoids GitHub's documented top-of-hour scheduling congestion; GitHub Actions scheduling is still best-effort and may be delayed. Each scheduled run creates one original vertical short documentary and attempts delivery to all enabled destinations: YouTube Shorts, Facebook Reels, Instagram Reels, and TikTok inbox.
 
 ## Required account connections
 
