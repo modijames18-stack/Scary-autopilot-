@@ -915,6 +915,19 @@
       "platforms": {},
       "failed_stage": "scene planning",
       "error": "Scene 1 footage search is ambiguous; it needs at least two concrete topic-specific anchors: 'dry riverbed cracked earth ocean delta'."
+    },
+    {
+      "time": "2026-11-19T13:36:56Z",
+      "github_run_id": "44534945568",
+      "github_run_attempt": "1",
+      "github_event": "schedule",
+      "format": "short",
+      "topic": "AI and jobs",
+      "status": "generation_failed",
+      "generated": false,
+      "platforms": {},
+      "failed_stage": "scene planning",
+      "error": "Scene 1 footage search does not match its narration or topic: 'human employee reviewing algorithmic software code'."
     }
   ]
 }
