@@ -954,6 +954,19 @@
       "platforms": {},
       "failed_stage": "scene planning",
       "error": "Scene 1 footage search is ambiguous; it needs at least two concrete topic-specific anchors: 'high voltage electricity pylons sunset silhouette'."
+    },
+    {
+      "time": "2026-11-19T22:06:29Z",
+      "github_run_id": "44625229526",
+      "github_run_attempt": "1",
+      "github_event": "schedule",
+      "format": "short",
+      "topic": "Ocean warming, sea-level rise and glacier loss",
+      "status": "generation_failed",
+      "generated": false,
+      "platforms": {},
+      "failed_stage": "script and evidence validation",
+      "error": "Short documentary narration must contain 110-160 words; got 105."
     }
   ]
 }
