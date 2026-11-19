@@ -23,7 +23,7 @@ concurrency:
 
 jobs:
   run:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
@@ -33,6 +33,7 @@ jobs:
           python-version: "3.12"
 
       - name: Ensure ffmpeg and fonts
+        id: media_tools
         run: |
           needs_install=false
           command -v ffmpeg >/dev/null 2>&1 || needs_install=true
@@ -40,22 +41,26 @@ jobs:
             needs_install=true
           fi
           if [ "$needs_install" = true ]; then
-            timeout 180s sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15 update
-            timeout 180s sudo apt-get -o Acquire::Retries=1 install -y --no-install-recommends ffmpeg fontconfig fonts-dejavu-core
+            timeout 600s sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update
+            timeout 600s sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y --no-install-recommends ffmpeg fontconfig fonts-dejavu-core
           fi
           ffmpeg -version | head -n 1
           fc-match "DejaVu Sans"
 
       - name: Install Python packages
+        id: python_packages
         run: pip install -r requirements.txt
 
       - name: Check Python syntax
+        id: python_syntax
         run: python -m py_compile autopilot.py resilient_runner.py preflight.py record_workflow.py
 
       - name: Run automated unit tests
+        id: unit_tests
         run: python -m unittest discover -s tests -v
 
       - name: Check platform configuration
+        id: platform_preflight
         env:
           AI_PROVIDER: ${{ vars.AI_PROVIDER }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -81,6 +86,7 @@ jobs:
         run: python preflight.py
 
       - name: Run autopilot
+        id: autopilot
         env:
           AI_PROVIDER: ${{ vars.AI_PROVIDER }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -129,6 +135,12 @@ jobs:
         if: always()
         env:
           JOB_STATUS: ${{ job.status }}
+          MEDIA_TOOLS_OUTCOME: ${{ steps.media_tools.outcome }}
+          PYTHON_PACKAGES_OUTCOME: ${{ steps.python_packages.outcome }}
+          PYTHON_SYNTAX_OUTCOME: ${{ steps.python_syntax.outcome }}
+          UNIT_TESTS_OUTCOME: ${{ steps.unit_tests.outcome }}
+          PREFLIGHT_OUTCOME: ${{ steps.platform_preflight.outcome }}
+          AUTOPILOT_OUTCOME: ${{ steps.autopilot.outcome }}
         run: |
           python record_workflow.py
           git config user.name "autopilot"

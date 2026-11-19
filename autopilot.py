@@ -181,7 +181,7 @@ def safe_ai_error_summary(exc):
 def gemini_model_sequence():
     """Return the configured primary Gemini model followed by safe, low-cost fallbacks."""
     primary = env("GEMINI_MODEL", "gemini-3.8-flash")
-    fallback = env("GEMINI_FALLBACK_MODELS", "gemini-3.6-flash")
+    fallback = env("GEMINI_FALLBACK_MODELS", "gemini-3.6-flash,gemini-3.5-flash-lite")
     models = []
     for candidate in [primary, *fallback.split(",")]:
         name = candidate.strip()

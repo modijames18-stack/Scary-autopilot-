@@ -138,5 +138,13 @@ class GeminiFailoverTests(unittest.TestCase):
         post.assert_called_once()
 
 
+    @patch.dict("os.environ", {}, clear=True)
+    def test_default_model_sequence_includes_low_cost_tertiary_fallback(self):
+        self.assertEqual(
+            autopilot.gemini_model_sequence(),
+            ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -106,5 +106,47 @@ class WorkflowHistoryTests(unittest.TestCase):
             self.assertFalse(path.exists())
 
 
+    def test_media_tools_failure_records_precise_stage(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "history.json"
+            env = {
+                "GITHUB_EVENT_NAME": "schedule",
+                "GITHUB_RUN_ID": "media-failure",
+                "GITHUB_RUN_ATTEMPT": "1",
+                "JOB_STATUS": "failure",
+                "MEDIA_TOOLS_OUTCOME": "failure",
+                "PYTHON_PACKAGES_OUTCOME": "skipped",
+            }
+
+            self.assertTrue(record_workflow_outcome(env, path))
+            saved = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(saved["runs"][0]["failed_stage"], "runner media-tool installation")
+            self.assertIn("FFmpeg/font setup", saved["runs"][0]["error"])
+
+    def test_autopilot_failure_records_generation_stage(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "history.json"
+            path.write_text(json.dumps({
+                "runs": [{
+                    "github_run_id": "autopilot-failure",
+                    "github_run_attempt": "1",
+                    "status": "started",
+                    "generated": False,
+                }]
+            }), encoding="utf-8")
+            env = {
+                "GITHUB_EVENT_NAME": "schedule",
+                "GITHUB_RUN_ID": "autopilot-failure",
+                "GITHUB_RUN_ATTEMPT": "1",
+                "JOB_STATUS": "failure",
+                "AUTOPILOT_OUTCOME": "failure",
+            }
+
+            self.assertTrue(record_workflow_outcome(env, path))
+            saved = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(saved["runs"][0]["failed_stage"], "autopilot generation or delivery")
+            self.assertEqual(saved["runs"][0]["status"], "workflow_failed_during_generation")
+
+
 if __name__ == "__main__":
     unittest.main()
