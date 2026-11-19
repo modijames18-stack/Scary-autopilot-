@@ -20,6 +20,9 @@ class WorkflowRunnerTests(unittest.TestCase):
         self.assertIn("runs-on: ubuntu-24.04", self.content)
         self.assertNotIn("runs-on: ubuntu-latest", self.content)
 
+    def test_schedule_runs_every_three_hours_away_from_hour_boundary(self):
+        self.assertIn('cron: "17 */3 * * *"', self.content)
+
     def test_media_installation_has_a_longer_retry_budget(self):
         self.assertGreaterEqual(self.content.count("timeout 600s sudo apt-get"), 2)
         self.assertIn("Acquire::Retries=3", self.content)
