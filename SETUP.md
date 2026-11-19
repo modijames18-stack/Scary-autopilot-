@@ -19,14 +19,14 @@ Add credentials in GitHub → repository → **Settings → Secrets and variable
 
 ## AI reliability settings
 
-Gemini uses `gemini-3.8-flash` by default and automatically tries `gemini-3.6-flash` after bounded transient failures. Both paths still pass through the same evidence and documentary-quality checks; a failed provider never triggers an invented fallback script.
+Gemini uses `gemini-3.8-flash` by default and automatically tries `gemini-3.6-flash` followed by the lower-cost `gemini-3.5-flash-lite` after bounded transient failures. Both paths still pass through the same evidence and documentary-quality checks; a failed provider never triggers an invented fallback script.
 
 Optional GitHub Actions repository **Variables** (not Secrets):
 
 | Variable | Default | Purpose |
 |---|---|---|
 | `GEMINI_MODEL` | `gemini-3.8-flash` | Primary Gemini model |
-| `GEMINI_FALLBACK_MODELS` | `gemini-3.6-flash` | Comma-separated fallback models |
+| `GEMINI_FALLBACK_MODELS` | `gemini-3.6-flash,gemini-3.5-flash-lite` | Comma-separated fallback models |
 | `GEMINI_TIMEOUT_SECONDS` | `75` | Per-request timeout, bounded by the application |
 | `GEMINI_ATTEMPTS_PER_MODEL` | `2` | Attempts per model, bounded by the application |
 
