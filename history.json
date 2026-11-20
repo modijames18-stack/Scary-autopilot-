@@ -1006,6 +1006,19 @@
       "platforms": {},
       "failed_stage": "scene planning",
       "error": "Scene plan failed strict validation after one targeted repair: AI footage plan did not return one scene for every narration segment."
+    },
+    {
+      "time": "2026-11-20T10:22:57Z",
+      "github_run_id": "44718665021",
+      "github_run_attempt": "1",
+      "github_event": "schedule",
+      "format": "short",
+      "topic": "Red or discolored rivers and harmful algal blooms",
+      "status": "generation_failed",
+      "generated": false,
+      "platforms": {},
+      "failed_stage": "scene planning",
+      "error": "Scene plan failed strict validation after one targeted repair: AI footage plan did not return one scene for every narration segment."
     }
   ]
 }
