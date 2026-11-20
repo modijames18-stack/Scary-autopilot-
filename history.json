@@ -967,6 +967,19 @@
       "platforms": {},
       "failed_stage": "script and evidence validation",
       "error": "Short documentary narration must contain 110-160 words; got 105."
+    },
+    {
+      "time": "2026-11-20T01:30:41Z",
+      "github_run_id": "44653696052",
+      "github_run_attempt": "1",
+      "github_event": "schedule",
+      "format": "short",
+      "topic": "Global AI governance and concentration of power",
+      "status": "generation_failed",
+      "generated": false,
+      "platforms": {},
+      "failed_stage": "scene planning",
+      "error": "Scene 1 footage search does not match its narration or topic: 'hyperscale server rack blue LED server room'."
     }
   ]
 }
