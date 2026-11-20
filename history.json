@@ -1136,6 +1136,22 @@
         }
       ],
       "completed_at": "2026-11-20T19:30:11Z"
+    },
+    {
+      "time": "2026-11-20T22:04:53Z",
+      "github_run_id": "44825766984",
+      "github_run_attempt": "1",
+      "github_event": "schedule",
+      "format": "short",
+      "topic": "Power-grid resilience and worldwide blackout scenarios",
+      "status": "generation_failed",
+      "generated": false,
+      "platforms": {},
+      "title": "Could Modern Power Grids Survive a Simultaneous Collapse?",
+      "source_count": 3,
+      "visual_scene_count": 6,
+      "failed_stage": "scene footage and rendering",
+      "error": "No stock footage passed the relevance check for narration scene 1: ['electrical grid pylon blackout', 'power grid blackout city', 'transmissionline power failure']. Refusing unrelated filler footage."
     }
   ]
 }
