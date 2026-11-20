@@ -469,17 +469,17 @@ TOPIC_VISUAL_ANCHORS = {
     "AI and jobs": {
         "ai", "worker", "employee", "factory", "robot", "automation", "office",
         "workplace", "training", "skill", "warehouse", "computer", "assembly",
-        "production", "classroom", "reskilling",
+        "production", "classroom", "reskilling", "algorithm", "software", "code",
     },
     "Global AI governance and concentration of power": {
-        "ai", "algorithm", "server", "data", "center", "datacenter", "computer",
-        "chip", "semiconductor", "government", "conference", "policy", "regulator",
-        "laboratory", "cloud", "compute",
+        "ai", "algorithm", "server", "rack", "data", "center", "datacenter", "computer",
+        "chip", "processor", "semiconductor", "software", "code", "government",
+        "conference", "policy", "regulator", "laboratory", "cloud", "compute",
     },
     "Power-grid resilience and worldwide blackout scenarios": {
-        "power", "electricity", "grid", "transmission", "substation", "transformer",
-        "powerline", "turbine", "solar", "wind", "generator", "powerplant",
-        "utility", "battery",
+        "power", "electricity", "grid", "transmission", "voltage", "pylon", "tower",
+        "transmissionline", "substation", "transformer", "powerline", "turbine",
+        "solar", "wind", "generator", "powerplant", "utility", "battery",
     },
     "Internet infrastructure and global connectivity": {
         "internet", "submarine", "undersea", "underwater", "cable", "fiber", "fibre",
@@ -570,7 +570,7 @@ def write_script(fmt, patterns, hist, topic=None, include_visual_plan=True):
     ]
     evidence_catalogue = evidence_catalogue_text()
     if fmt == "short":
-        spec = ("A SHORT vertical explainer, 120-150 spoken words, about 50 seconds. "
+        spec = ("A SHORT vertical explainer, 125-145 spoken words, about 50-60 seconds. Count the narration words before returning and never submit fewer than 120 or more than 150. "
                 "Open with a gripping question or plausible scenario. Explain one real risk "
                 "and end with a clearly labeled SOLUTIONS section containing 2-3 concrete actions plus a thoughtful question for viewers.")
     else:
@@ -638,7 +638,10 @@ Reply with ONLY a JSON object with these keys:
         "Be compelling, evidence-aware, balanced, and solution-focused.",
         prompt, max_tokens=1200 if fmt == "short" else 5000, json_mode=True,
     )
-    meta = ensure_viewer_question(parse_meta(raw), fmt)
+    meta = parse_meta(raw)
+    if fmt == "short":
+        meta = repair_short_script_length(meta, topic)
+    meta = ensure_viewer_question(meta, fmt)
     meta = validate_documentary_script(
         verify_source_links(meta), expected_topic=topic, fmt=fmt
     )
@@ -654,7 +657,8 @@ Reply with ONLY a JSON object with these keys:
                 "Reply with ONLY the same JSON object (same keys).\n\n" + json.dumps(meta),
                 max_tokens=1200, json_mode=True,
             )
-            polished = ensure_viewer_question(parse_meta(better), fmt)
+            polished = repair_short_script_length(parse_meta(better), topic)
+            polished = ensure_viewer_question(polished, fmt)
             meta = validate_documentary_script(
                 verify_source_links(polished), expected_topic=topic, fmt=fmt
             )
@@ -666,7 +670,7 @@ Reply with ONLY a JSON object with these keys:
 
 
 def make_visual_plan(narration, topic=None, fmt="short"):
-    """Create fine-grained narration scenes and require concrete topic-specific searches."""
+    """Create narration-matched scenes; retry once with exact segment guidance, then fail closed."""
     sentences = re.split(r"(?<=[.!?])\s+", narration.strip())
     sentences = [sentence.strip() for sentence in sentences if sentence.strip()]
     group_size = 1 if fmt == "short" else 2
@@ -682,97 +686,134 @@ def make_visual_plan(narration, topic=None, fmt="short"):
             f"only {len(chunks)} were available."
         )
 
-    numbered = "\n".join(f"{i + 1}. {chunk}" for i, chunk in enumerate(chunks))
+    numbered = "\n".join(f"{i + 1}. EXACT NARRATION SEGMENT: {chunk}" for i, chunk in enumerate(chunks))
     topic_anchors = TOPIC_VISUAL_ANCHORS.get(topic, set())
     if topic and len(topic_anchors) < 2:
         raise ValueError(f"No strict visual anchors are configured for topic {topic!r}.")
+    anchor_list = ", ".join(sorted(topic_anchors))
 
-    raw = ask_ai(
-        "You are a documentary footage researcher. Match visuals precisely to narration. "
-        "Never imply that illustrative footage documents an event it does not show.",
+    def validate_plan(raw):
+        try:
+            start, end = raw.find("{"), raw.rfind("}")
+            if start < 0 or end <= start:
+                raise ValueError("AI footage plan did not contain a JSON object.")
+            data = json.loads(raw[start:end + 1])
+        except (TypeError, json.JSONDecodeError, ValueError):
+            raise ValueError(
+                "AI footage plan returned invalid JSON; refusing to use unverified filler footage."
+            ) from None
+
+        scenes = data.get("scenes", []) if isinstance(data, dict) else []
+        if len(scenes) != len(chunks):
+            raise ValueError("AI footage plan did not return one scene for every narration segment.")
+
+        topic_terms = visual_tokens(" ".join(TOPIC_VISUAL_TERMS.get(topic, set())))
+        anchor_terms = visual_tokens(" ".join(topic_anchors))
+        plan = []
+        stopwords = {
+            "the", "and", "for", "with", "that", "this", "from", "into", "are", "was",
+            "were", "will", "could", "would", "should", "have", "has", "had", "its",
+            "their", "they", "them", "then", "than", "when", "where", "what", "which",
+            "who", "how", "why", "about", "after", "before", "while", "because", "there",
+            "these", "those", "some", "more", "most", "many", "much", "very", "already",
+            "also", "only", "not", "but", "yet", "can", "may", "might", "if", "as",
+            "at", "by", "on", "in", "of", "to", "a", "an", "is", "it",
+        }
+        for expected, item in enumerate(scenes, 1):
+            if not isinstance(item, dict) or item.get("index") != expected or not isinstance(item.get("keywords"), list):
+                raise ValueError("AI footage plan has missing or out-of-order scene indexes.")
+            keywords = [
+                normalize_visual_search_keyword(k, topic)
+                for k in item["keywords"] if str(k).strip()
+            ][:4]
+            if len(keywords) < 2:
+                raise ValueError(f"Scene {expected} has too few specific footage searches.")
+
+            scene_terms = visual_tokens(chunks[expected - 1]) - stopwords
+            keyword_terms = []
+            for keyword in keywords:
+                if BANNED_VISUAL_PATTERN.search(keyword):
+                    raise ValueError(
+                        f"Scene {expected} requested fictional or horror footage: {keyword!r}."
+                    )
+                tokens = visual_tokens(keyword)
+                meaningful = tokens - GENERIC_VISUAL_TERMS
+                if len(meaningful) < 1:
+                    raise ValueError(f"Scene {expected} contains a generic footage search: {keyword!r}.")
+                if topic and not (tokens & scene_terms or tokens & topic_terms or len(tokens & anchor_terms) >= 2):
+                    raise ValueError(
+                        f"Scene {expected} footage search does not match its narration or topic: {keyword!r}."
+                    )
+                anchor_overlap = tokens & anchor_terms
+                if topic and len(anchor_overlap) < 2:
+                    raise ValueError(
+                        f"Scene {expected} footage search is ambiguous; it needs at least two "
+                        f"concrete topic-specific anchors: {keyword!r}."
+                    )
+                keyword_terms.append(tokens)
+
+            if topic and not any(tokens & scene_terms for tokens in keyword_terms):
+                raise ValueError(
+                    f"Scene {expected} has no footage search tied to its specific narration segment."
+                )
+            if topic and not any(len(tokens & anchor_terms) >= 2 for tokens in keyword_terms):
+                raise ValueError(
+                    f"Scene {expected} has no sufficiently specific search for topic {topic!r}."
+                )
+            plan.append({"text": chunks[expected - 1], "keywords": keywords})
+        return plan
+
+    first_prompt = (
         "For each numbered narration segment, return 2-4 concise, concrete search phrases "
-        "for authentic documentary footage that directly depicts that segment. Use physical "
-        "subjects such as the actual ecosystem, equipment, infrastructure, workers or scientific "
-        "instruments. Every phrase must contain at least TWO concrete visual anchors for the "
-        f"topic {topic!r}; do not rely on ambiguous words such as 'cable', 'network', 'data', "
-        "'global', 'service' or 'technology' by themselves. Include at least one detail from "
-        "the narration segment. For red/discolored-river topics, use neutral scientific wording "
-        "such as 'red-discolored river water', 'algal bloom' or 'water sampling'; never use "
-        "blood metaphors or imply literal blood. Keep the same order and number of scenes. If a claim is "
-        "hypothetical, use clearly illustrative real-world subject footage, never fake news "
-        "imagery. Return ONLY JSON: "
-        '{"scenes":[{"index":1,"keywords":["...","..."]}]}\n\n' + numbered,
-        max_tokens=1800, json_mode=True,
+        "for authentic documentary footage that directly depicts that exact segment. At least "
+        "one phrase in each scene MUST repeat a visible subject or concrete content noun from "
+        "that exact sentence; do not reuse generic topic searches across unrelated sentences. "
+        "Every phrase must contain at least TWO concrete anchors from this topic vocabulary: "
+        + anchor_list + ". Use physical subjects such as ecosystems, equipment, infrastructure, "
+        "workers, or scientific instruments. Do not rely on ambiguous words such as 'global', "
+        "'service', or 'technology'. For red/discolored-river topics, use neutral scientific "
+        "wording such as 'red-discolored river water', 'algal bloom' or 'water sampling'; never "
+        "use blood metaphors or imply literal blood. Keep the same order and number of scenes. "
+        "If a claim is hypothetical, use clearly illustrative real-world subject footage, never "
+        "fake news imagery. Return ONLY JSON: "
+        '{"scenes":[{"index":1,"keywords":["...","..."]}]}\n\n' + numbered
     )
     try:
-        start, end = raw.find("{"), raw.rfind("}")
-        if start < 0 or end <= start:
-            raise ValueError("AI footage plan did not contain a JSON object.")
-        data = json.loads(raw[start:end + 1])
-    except (TypeError, json.JSONDecodeError, ValueError) as exc:
+        raw = ask_ai(
+            "You are a documentary footage researcher. Match visuals precisely to narration. "
+            "Never imply that illustrative footage documents an event it does not show.",
+            first_prompt, max_tokens=1800, json_mode=True,
+        )
+        try:
+            return validate_plan(raw)
+        except ValueError as first_error:
+            repair_prompt = (
+                "Your previous scene plan failed strict validation: " + str(first_error) + "\n"
+                "Repair the searches only. Do not rewrite narration, change scene order, or invent "
+                "footage. For every numbered segment, include at least one phrase that repeats a "
+                "visible subject or concrete noun from that exact narration segment, plus at least "
+                "two topic anchors from this vocabulary: " + anchor_list + ". Do not use the same "
+                "generic phrase for several scenes. Return ONLY the required JSON object.\n\n"
+                + numbered
+            )
+            repaired_raw = ask_ai(
+                "You are correcting a documentary footage plan after a specific validation failure. "
+                "Be exact, conservative, and scene-specific.",
+                repair_prompt, max_tokens=1800, json_mode=True,
+            )
+            try:
+                return validate_plan(repaired_raw)
+            except ValueError as second_error:
+                raise ValueError(
+                    "Scene plan failed strict validation after one targeted repair: "
+                    + str(second_error)
+                ) from None
+    except ValueError:
+        raise
+    except Exception as exc:
         raise ValueError(
-            "AI footage plan returned invalid JSON; refusing to use unverified filler footage."
+            "Scene planning could not complete safely: " + safe_ai_error_summary(exc)
         ) from None
-
-    scenes = data.get("scenes", []) if isinstance(data, dict) else []
-    if len(scenes) != len(chunks):
-        raise ValueError("AI footage plan did not return one scene for every narration segment.")
-
-    topic_terms = visual_tokens(" ".join(TOPIC_VISUAL_TERMS.get(topic, set())))
-    anchor_terms = visual_tokens(" ".join(topic_anchors))
-    plan = []
-    stopwords = {
-        "the", "and", "for", "with", "that", "this", "from", "into", "are", "was",
-        "were", "will", "could", "would", "should", "have", "has", "had", "its",
-        "their", "they", "them", "then", "than", "when", "where", "what", "which",
-        "who", "how", "why", "about", "after", "before", "while", "because", "there",
-        "these", "those", "some", "more", "most", "many", "much", "very", "already",
-        "also", "only", "not", "but", "yet", "can", "may", "might", "if", "as",
-        "at", "by", "on", "in", "of", "to", "a", "an", "is", "it",
-    }
-    for expected, item in enumerate(scenes, 1):
-        if not isinstance(item, dict) or item.get("index") != expected or not isinstance(item.get("keywords"), list):
-            raise ValueError("AI footage plan has missing or out-of-order scene indexes.")
-        keywords = [
-            normalize_visual_search_keyword(k, topic)
-            for k in item["keywords"] if str(k).strip()
-        ][:4]
-        if len(keywords) < 2:
-            raise ValueError(f"Scene {expected} has too few specific footage searches.")
-
-        scene_terms = visual_tokens(chunks[expected - 1]) - stopwords
-        keyword_terms = []
-        for keyword in keywords:
-            if BANNED_VISUAL_PATTERN.search(keyword):
-                raise ValueError(
-                    f"Scene {expected} requested fictional or horror footage: {keyword!r}."
-                )
-            tokens = visual_tokens(keyword)
-            meaningful = tokens - GENERIC_VISUAL_TERMS
-            if len(meaningful) < 1:
-                raise ValueError(f"Scene {expected} contains a generic footage search: {keyword!r}.")
-            if topic and not (tokens & scene_terms or tokens & topic_terms or len(tokens & anchor_terms) >= 2):
-                raise ValueError(
-                    f"Scene {expected} footage search does not match its narration or topic: {keyword!r}."
-                )
-            anchor_overlap = tokens & anchor_terms
-            if topic and len(anchor_overlap) < 2:
-                raise ValueError(
-                    f"Scene {expected} footage search is ambiguous; it needs at least two "
-                    f"concrete topic-specific anchors: {keyword!r}."
-                )
-            keyword_terms.append(tokens)
-
-        if topic and not any(tokens & scene_terms for tokens in keyword_terms):
-            raise ValueError(
-                f"Scene {expected} has no footage search tied to its specific narration segment."
-            )
-        if topic and not any(len(tokens & anchor_terms) >= 2 for tokens in keyword_terms):
-            raise ValueError(
-                f"Scene {expected} has no sufficiently specific search for topic {topic!r}."
-            )
-        plan.append({"text": chunks[expected - 1], "keywords": keywords})
-    return plan
 
 
 def parse_meta(raw):
@@ -817,6 +858,40 @@ def ensure_viewer_question(meta, fmt):
         )
     meta["narration"] = repaired
     return meta
+
+
+def repair_short_script_length(meta, topic):
+    """Repair only short-script length; preserve the original curated sources and metadata."""
+    narration = str(meta.get("narration", "")).strip()
+    count = len(re.findall(r"\b[\w’'-]+\b", narration))
+    if 120 <= count <= 150:
+        return meta
+
+    raw = ask_ai(
+        "You are a careful documentary script editor. Do not invent evidence.",
+        "This short documentary narration has " + str(count) + " words. Revise ONLY the narration "
+        "to 125-145 words. Preserve the exact FACT, FORECAST, WHAT-IF, and SOLUTIONS labels in "
+        "their existing order, preserve the named institution and all existing supported claims, "
+        "and keep the final sentence as a thoughtful viewer question. Do not add statistics, "
+        "dates, quotations, studies, people, institutions, events, sources, or URLs. Expand only "
+        "with clear transitions and explanation of points already present; if it cannot be done "
+        "without adding claims, return the original narration unchanged. Return the same JSON "
+        "object and keys. The required topic is exactly " + repr(topic) + ".\n\n" + json.dumps(meta),
+        max_tokens=1200, json_mode=True,
+    )
+    revised = parse_meta(raw)
+    if revised.get("topic") != topic:
+        raise ValueError("Short-script length repair changed the required topic.")
+    repaired = dict(meta)
+    repaired["narration"] = str(revised.get("narration", "")).strip()
+    repaired_count = len(re.findall(r"\b[\w’'-]+\b", repaired["narration"]))
+    if not 120 <= repaired_count <= 150:
+        raise ValueError(
+            "Short-script length repair did not produce 120-150 words; "
+            f"got {repaired_count}. Refusing to publish an incomplete script."
+        )
+    # Deliberately retain the original topic, source list, title, and visual metadata.
+    return repaired
 
 
 def validate_documentary_script(meta, expected_topic, fmt):
@@ -1049,7 +1124,8 @@ def visual_tokens(value):
         "vehicles": "vehicle", "emissions": "emission", "storms": "storm",
         "floods": "flood", "droughts": "drought", "robots": "robot", "robotics": "robot",
         "factories": "factory", "offices": "office", "chips": "chip",
-        "algorithms": "algorithm", "regulators": "regulator",
+        "algorithms": "algorithm", "algorithmic": "algorithm", "regulators": "regulator",
+        "riverbed": "river", "riverbeds": "river", "pylons": "pylon", "racks": "rack",
         "aquifers": "aquifer", "reservoirs": "reservoir", "wetlands": "wetland",
         "wells": "well", "dams": "dam", "satellites": "satellite",
         "ships": "ship", "routers": "router", "skills": "skill",
