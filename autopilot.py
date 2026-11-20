@@ -864,7 +864,7 @@ def repair_short_script_length(meta, topic):
     """Repair only short-script length; preserve the original curated sources and metadata."""
     narration = str(meta.get("narration", "")).strip()
     count = len(re.findall(r"\b[\w’'-]+\b", narration))
-    if 120 <= count <= 150:
+    if 125 <= count <= 145:
         return meta
 
     raw = ask_ai(
@@ -885,9 +885,9 @@ def repair_short_script_length(meta, topic):
     repaired = dict(meta)
     repaired["narration"] = str(revised.get("narration", "")).strip()
     repaired_count = len(re.findall(r"\b[\w’'-]+\b", repaired["narration"]))
-    if not 120 <= repaired_count <= 150:
+    if not 125 <= repaired_count <= 145:
         raise ValueError(
-            "Short-script length repair did not produce 120-150 words; "
+            "Short-script length repair did not produce 125-145 words; "
             f"got {repaired_count}. Refusing to publish an incomplete script."
         )
     # Deliberately retain the original topic, source list, title, and visual metadata.
