@@ -1126,7 +1126,7 @@ def visual_tokens(value):
         "factories": "factory", "offices": "office", "chips": "chip",
         "algorithms": "algorithm", "algorithmic": "algorithm", "regulators": "regulator",
         "riverbed": "river", "riverbeds": "river", "pylons": "pylon", "racks": "rack",
-        "aquifers": "aquifer", "reservoirs": "reservoir", "wetlands": "wetland",
+        "aquifers": "aquifer", "reservoirs": "reservoir", "wetlands": "wetland", "monitoring": "monitor",
         "wells": "well", "dams": "dam", "satellites": "satellite",
         "ships": "ship", "routers": "router", "skills": "skill",
         "pedestrians": "pedestrian", "masks": "mask", "streets": "street",
