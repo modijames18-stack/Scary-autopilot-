@@ -56,6 +56,50 @@ class VisualPlanTests(unittest.TestCase):
         self.assertEqual(plan[1]["text"], "Workers use new tools.")
         self.assertEqual(plan[5]["text"], "New skills can protect livelihoods.")
 
+    def test_retries_scene_plan_once_with_exact_segment_guidance(self):
+        narration = water_narration()
+        bad = water_scenes()
+        bad[0] = {"index": 1, "keywords": ["office workers meeting", "factory robot assembly"]}
+        good = water_scenes()
+        with patch.object(
+            autopilot, "ask_ai",
+            side_effect=[json.dumps({"scenes": bad}), json.dumps({"scenes": good})],
+        ) as ask:
+            plan = autopilot.make_visual_plan(narration, topic=WATER_TOPIC, fmt="short")
+        self.assertEqual(len(plan), 6)
+        self.assertEqual(ask.call_count, 2)
+        self.assertIn("EXACT NARRATION SEGMENT: UN-Water documents river stress", ask.call_args_list[1].args[1])
+        self.assertIn("Repair the searches only", ask.call_args_list[1].args[1])
+
+    def test_visual_tokens_normalize_compound_documentary_terms(self):
+        tokens = autopilot.visual_tokens(
+            "dry riverbed human employee reviewing algorithmic software code "
+            "high voltage electricity pylons hyperscale server racks"
+        )
+        self.assertTrue({"river", "employee", "algorithm", "software", "code", "voltage", "pylon", "server", "rack"} <= tokens)
+
+    def test_stock_tags_accept_new_concrete_topic_anchors(self):
+        self.assertTrue(autopilot.stock_tags_match(
+            "human employee reviewing algorithmic software code",
+            "human employee reviewing algorithmic software code",
+            "AI and jobs",
+        ))
+        self.assertTrue(autopilot.stock_tags_match(
+            "hyperscale server rack blue LED server room",
+            "hyperscale server rack blue LED server room",
+            "Global AI governance and concentration of power",
+        ))
+        self.assertTrue(autopilot.stock_tags_match(
+            "high voltage electricity pylons sunset silhouette",
+            "high voltage electricity pylons sunset silhouette",
+            "Power-grid resilience and worldwide blackout scenarios",
+        ))
+        self.assertTrue(autopilot.stock_tags_match(
+            "dry riverbed cracked earth ocean delta",
+            "dry riverbed cracked earth ocean delta",
+            WATER_TOPIC,
+        ))
+
     def test_rejects_missing_scene(self):
         payload = {"scenes": [water_scenes()[0]]}
         with patch.object(autopilot, "ask_ai", return_value=json.dumps(payload)):

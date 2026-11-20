@@ -1,5 +1,6 @@
 """Regression tests for documentary quality gates, run history, and API read-back."""
 import json
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -83,6 +84,45 @@ class DocumentaryQualityTests(unittest.TestCase):
             autopilot.validate_documentary_script(
                 meta, "Global AI governance and concentration of power", "short"
             )
+
+    def test_repairs_short_script_length_and_preserves_curated_sources(self):
+        original = {
+            "topic": TOPIC,
+            "title": "Short test",
+            "description": "A documentary test.",
+            "narration": (
+                "FACT: UN-Water documents water scarcity. "
+                "FORECAST: Some basins may face pressure. "
+                "WHAT-IF: Imagine a dry reservoir. "
+                "SOLUTIONS: Communities can conserve water and repair pipes. "
+                "What should leaders do first?"
+            ),
+            "visual_keywords": ["river basin", "water monitoring", "reservoir", "groundwater"],
+            "sources": [
+                {"title": "UN-Water", "url": "https://www.unwater.org/a"},
+                {"title": "UNU-INWEH", "url": "https://www.unwater.org/b"},
+            ],
+        }
+        expanded = good_meta()
+        expanded["visual_keywords"] = ["river basin", "water monitoring", "reservoir", "groundwater"]
+        expanded["sources"] = [{"title": "Unapproved source", "url": "https://example.com/fake"}]
+        expanded["narration"] += (
+            " Local plans should rely on measured conditions and transparent public information."
+        )
+        with patch.object(autopilot, "ask_ai", return_value=json.dumps(expanded)) as ask:
+            repaired = autopilot.repair_short_script_length(original, TOPIC)
+        count = len(re.findall(r"\b[\w’'-]+\b", repaired["narration"]))
+        self.assertTrue(120 <= count <= 150)
+        self.assertEqual(repaired["sources"], original["sources"])
+        self.assertEqual(repaired["topic"], TOPIC)
+        self.assertEqual(ask.call_count, 1)
+
+    def test_short_script_length_repair_is_not_called_when_already_in_range(self):
+        meta = good_meta()
+        with patch.object(autopilot, "ask_ai") as ask:
+            result = autopilot.repair_short_script_length(meta, TOPIC)
+        self.assertIs(result, meta)
+        ask.assert_not_called()
 
     def test_rejects_topic_drift(self):
         meta = good_meta()
