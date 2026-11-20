@@ -111,7 +111,7 @@ class DocumentaryQualityTests(unittest.TestCase):
         )
         with patch.object(autopilot, "ask_ai", return_value=json.dumps(expanded)) as ask:
             repaired = autopilot.repair_short_script_length(original, TOPIC)
-        count = len(re.findall(r"\\b[\\w’'-]+\\b", repaired["narration"]))
+        count = len(re.findall(r"\b[\w’'-]+\b", repaired["narration"]))
         self.assertTrue(120 <= count <= 150)
         self.assertEqual(repaired["sources"], original["sources"])
         self.assertEqual(repaired["topic"], TOPIC)
