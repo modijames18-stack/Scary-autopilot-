@@ -1246,6 +1246,19 @@
       "platforms": {},
       "failed_stage": "scene planning",
       "error": "Scene planning could not complete safely: Gemini API quota or billing limit reached. Check Google AI Studio usage and billing, or configure ANTHROPIC_API_KEY and set AI_PROVIDER=anthropic."
+    },
+    {
+      "time": "2026-11-21T21:57:25Z",
+      "github_run_id": "44954094423",
+      "github_run_attempt": "1",
+      "github_event": "schedule",
+      "format": "short",
+      "topic": "Climate change, extreme weather and food security",
+      "status": "generation_failed",
+      "generated": false,
+      "platforms": {},
+      "failed_stage": "scene planning",
+      "error": "Scene planning could not complete safely: Gemini API quota or billing limit reached. Check Google AI Studio usage and billing, or configure ANTHROPIC_API_KEY and set AI_PROVIDER=anthropic."
     }
   ]
 }
