@@ -1152,6 +1152,19 @@
       "visual_scene_count": 6,
       "failed_stage": "scene footage and rendering",
       "error": "No stock footage passed the relevance check for narration scene 1: ['electrical grid pylon blackout', 'power grid blackout city', 'transmissionline power failure']. Refusing unrelated filler footage."
+    },
+    {
+      "time": "2026-11-21T01:31:36Z",
+      "github_run_id": "44850575648",
+      "github_run_attempt": "1",
+      "github_event": "schedule",
+      "format": "short",
+      "topic": "Ocean warming, sea-level rise and glacier loss",
+      "status": "generation_failed",
+      "generated": false,
+      "platforms": {},
+      "failed_stage": "scene planning",
+      "error": "Scene plan failed strict validation after one targeted repair: AI footage plan has missing or out-of-order scene indexes."
     }
   ]
 }
