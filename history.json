@@ -1204,6 +1204,22 @@
       "platforms": {},
       "failed_stage": "scene planning",
       "error": "Scene planning could not complete safely: Gemini API request failed after bounded retries; inspect redacted workflow diagnostics."
+    },
+    {
+      "time": "2026-11-21T13:17:08Z",
+      "github_run_id": "44907996914",
+      "github_run_attempt": "1",
+      "github_event": "schedule",
+      "format": "short",
+      "topic": "Red or discolored rivers and harmful algal blooms",
+      "status": "generation_failed",
+      "generated": false,
+      "platforms": {},
+      "title": "Why Are Some Rivers Turning Red?",
+      "source_count": 3,
+      "visual_scene_count": 8,
+      "failed_stage": "scene footage and rendering",
+      "error": "No unused stock footage passed the relevance check for narration scene 8: ['river water sampling lab', 'lake water quality testing', 'river monitoring algae sampling']. Refusing repeated or unrelated filler footage."
     }
   ]
 }
