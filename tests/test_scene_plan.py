@@ -100,6 +100,54 @@ class VisualPlanTests(unittest.TestCase):
             WATER_TOPIC,
         ))
 
+    def test_normalizes_out_of_order_scene_indexes(self):
+        scenes = list(reversed(water_scenes()))
+        with patch.object(autopilot, "ask_ai", return_value=json.dumps({"scenes": scenes})):
+            plan = autopilot.make_visual_plan(water_narration(), topic=WATER_TOPIC, fmt="short")
+        self.assertEqual(plan[0]["text"], "UN-Water documents river stress.")
+        self.assertEqual(plan[0]["keywords"], water_scenes()[0]["keywords"])
+
+    def test_normalizes_zero_based_scene_indexes(self):
+        scenes = water_scenes()
+        for scene in scenes:
+            scene["index"] -= 1
+        with patch.object(autopilot, "ask_ai", return_value=json.dumps({"scenes": scenes})):
+            plan = autopilot.make_visual_plan(water_narration(), topic=WATER_TOPIC, fmt="short")
+        self.assertEqual(len(plan), 6)
+        self.assertEqual(plan[-1]["text"], "Better monitoring can help.")
+
+    def test_accepts_numeric_string_scene_indexes(self):
+        scenes = water_scenes()
+        for scene in scenes:
+            scene["index"] = str(scene["index"])
+        with patch.object(autopilot, "ask_ai", return_value=json.dumps({"scenes": scenes})):
+            plan = autopilot.make_visual_plan(water_narration(), topic=WATER_TOPIC, fmt="short")
+        self.assertEqual(len(plan), 6)
+
+    def test_accepts_omitted_indexes_when_array_order_matches_narration(self):
+        scenes = water_scenes()
+        for scene in scenes:
+            scene.pop("index")
+        with patch.object(autopilot, "ask_ai", return_value=json.dumps({"scenes": scenes})):
+            plan = autopilot.make_visual_plan(water_narration(), topic=WATER_TOPIC, fmt="short")
+        self.assertEqual(plan[0]["text"], "UN-Water documents river stress.")
+        self.assertEqual(len(plan), 6)
+
+    def test_rejects_duplicate_scene_indexes(self):
+        scenes = water_scenes()
+        scenes[1]["index"] = 1
+        with patch.object(autopilot, "ask_ai", return_value=json.dumps({"scenes": scenes})):
+            with self.assertRaisesRegex(ValueError, "duplicate or inconsistent scene indexes"):
+                autopilot.make_visual_plan(water_narration(), topic=WATER_TOPIC, fmt="short")
+
+    def test_rejects_reordered_scenes_when_indexes_are_omitted(self):
+        scenes = list(reversed(water_scenes()))
+        for scene in scenes:
+            scene.pop("index")
+        with patch.object(autopilot, "ask_ai", return_value=json.dumps({"scenes": scenes})):
+            with self.assertRaises(ValueError):
+                autopilot.make_visual_plan(water_narration(), topic=WATER_TOPIC, fmt="short")
+
     def test_rejects_missing_scene(self):
         payload = {"scenes": [water_scenes()[0]]}
         with patch.object(autopilot, "ask_ai", return_value=json.dumps(payload)):
