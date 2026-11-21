@@ -137,7 +137,7 @@ class VisualPlanTests(unittest.TestCase):
         scenes = water_scenes()
         scenes[1]["index"] = 1
         with patch.object(autopilot, "ask_ai", return_value=json.dumps({"scenes": scenes})):
-            with self.assertRaisesRegex(ValueError, "duplicate or inconsistent scene indexes"):
+            with self.assertRaisesRegex(ValueError, "missing, duplicate, or inconsistent scene indexes"):
                 autopilot.make_visual_plan(water_narration(), topic=WATER_TOPIC, fmt="short")
 
     def test_rejects_reordered_scenes_when_indexes_are_omitted(self):
