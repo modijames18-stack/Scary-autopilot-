@@ -704,8 +704,47 @@ def make_visual_plan(narration, topic=None, fmt="short"):
             ) from None
 
         scenes = data.get("scenes", []) if isinstance(data, dict) else []
-        if len(scenes) != len(chunks):
+        if not isinstance(scenes, list) or len(scenes) != len(chunks):
             raise ValueError("AI footage plan did not return one scene for every narration segment.")
+
+        # Models sometimes return valid scenes with indexes as strings, zero-based indexes,
+        # omitted indexes, or a shuffled array. Normalize only unambiguous structures:
+        # complete numeric permutations are sorted by index; omitted indexes use array order
+        # only when every supplied index (if any) agrees with its current position. The
+        # narration/anchor checks below still validate every scene against its exact sentence.
+        parsed_indexes = []
+        for item in scenes:
+            if not isinstance(item, dict) or not isinstance(item.get("keywords"), list):
+                raise ValueError("AI footage plan contains an invalid scene object.")
+            raw_index = item.get("index")
+            if raw_index is None or raw_index == "":
+                parsed_indexes.append(None)
+            elif isinstance(raw_index, int) and not isinstance(raw_index, bool):
+                parsed_indexes.append(raw_index)
+            elif isinstance(raw_index, str) and raw_index.strip().isdigit():
+                parsed_indexes.append(int(raw_index.strip()))
+            else:
+                raise ValueError("AI footage plan has a non-numeric scene index.")
+
+        present_indexes = [index for index in parsed_indexes if index is not None]
+        expected_indexes = set(range(1, len(chunks) + 1))
+        zero_based_indexes = set(range(len(chunks)))
+        if len(present_indexes) == len(chunks) and len(set(present_indexes)) == len(chunks):
+            if set(present_indexes) in (expected_indexes, zero_based_indexes):
+                scenes = [
+                    item for _, item in sorted(zip(present_indexes, scenes), key=lambda pair: pair[0])
+                ]
+            else:
+                raise ValueError("AI footage plan has missing, duplicate, or inconsistent scene indexes.")
+        elif len(present_indexes) < len(chunks):
+            if not all(
+                index is None or index in {position, position + 1}
+                for position, index in enumerate(parsed_indexes)
+            ):
+                raise ValueError("AI footage plan has missing, duplicate, or inconsistent scene indexes.")
+            # Array order is accepted only for fully omitted or position-consistent indexes.
+        else:
+            raise ValueError("AI footage plan has missing, duplicate, or inconsistent scene indexes.")
 
         topic_terms = visual_tokens(" ".join(TOPIC_VISUAL_TERMS.get(topic, set())))
         anchor_terms = visual_tokens(" ".join(topic_anchors))
@@ -720,8 +759,8 @@ def make_visual_plan(narration, topic=None, fmt="short"):
             "at", "by", "on", "in", "of", "to", "a", "an", "is", "it",
         }
         for expected, item in enumerate(scenes, 1):
-            if not isinstance(item, dict) or item.get("index") != expected or not isinstance(item.get("keywords"), list):
-                raise ValueError("AI footage plan has missing or out-of-order scene indexes.")
+            if not isinstance(item, dict) or not isinstance(item.get("keywords"), list):
+                raise ValueError("AI footage plan contains an invalid scene object.")
             keywords = [
                 normalize_visual_search_keyword(k, topic)
                 for k in item["keywords"] if str(k).strip()
@@ -773,7 +812,8 @@ def make_visual_plan(narration, topic=None, fmt="short"):
         "workers, or scientific instruments. Do not rely on ambiguous words such as 'global', "
         "'service', or 'technology'. For red/discolored-river topics, use neutral scientific "
         "wording such as 'red-discolored river water', 'algal bloom' or 'water sampling'; never "
-        "use blood metaphors or imply literal blood. Keep the same order and number of scenes. "
+        "use blood metaphors or imply literal blood. Return exactly one scene per segment, in "
+        "the same array order, with integer indexes 1 through N and no gaps. Never omit a sentence. "
         "If a claim is hypothetical, use clearly illustrative real-world subject footage, never "
         "fake news imagery. Return ONLY JSON: "
         '{"scenes":[{"index":1,"keywords":["...","..."]}]}\n\n' + numbered
@@ -790,8 +830,10 @@ def make_visual_plan(narration, topic=None, fmt="short"):
             repair_prompt = (
                 "Your previous scene plan failed strict validation: " + str(first_error) + "\n"
                 "Repair the searches only. Do not rewrite narration, change scene order, or invent "
-                "footage. For every numbered segment, include at least one phrase that repeats a "
-                "visible subject or concrete noun from that exact narration segment, plus at least "
+                "footage. Return exactly one scene for every numbered segment, in the same "
+                "array order, with integer indexes 1 through N and no gaps. For every numbered "
+                "segment, include at least one phrase that repeats a visible subject or concrete noun "
+                "from that exact narration segment, plus at least "
                 "two topic anchors from this vocabulary: " + anchor_list + ". Do not use the same "
                 "generic phrase for several scenes. Return ONLY the required JSON object.\n\n"
                 + numbered
