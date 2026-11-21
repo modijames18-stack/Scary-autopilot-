@@ -1287,16 +1287,20 @@ def find_candidates(keywords, fmt, W, topic=None):
     return candidates
 
 
-def fetch_clips(keywords, fmt, need, W, H, topic=None):
+def fetch_clips(keywords, fmt, need, W, H, topic=None, used_ids=None, segment_prefix="seg"):
+    """Fetch relevant clips with unique filenames and optional cross-scene source exclusion."""
     max_clips = 12 if fmt == "short" else 36
     order = find_candidates(keywords, fmt, W, topic=topic)
     clips, seen, total = [], set(), 0.0
+    used_ids = used_ids if used_ids is not None else set()
     for vid_id, link, vdur in order:
-        if vid_id in seen or len(clips) >= max_clips or total >= need + 2:
+        if vid_id in seen or vid_id in used_ids or len(clips) >= max_clips or total >= need + 2:
             continue
         seen.add(vid_id)
         raw = WORK / f"raw_{vid_id}.mp4"
-        seg = WORK / f"seg_{len(clips):02}.mp4"
+        # The prefix is supplied by build_video per narration scene. Without it,
+        # every fetch_clips call would overwrite seg_00.mp4, seg_01.mp4, etc.
+        seg = WORK / f"{segment_prefix}_{len(clips):02}.mp4"
         try:
             with requests.get(link, stream=True, timeout=90) as resp:
                 resp.raise_for_status()
@@ -1313,6 +1317,8 @@ def fetch_clips(keywords, fmt, need, W, H, topic=None):
             ])
             clips.append((seg.name, duration))
             total += duration
+            # Exclude this provider clip from every later narration scene.
+            used_ids.add(vid_id)
         except Exception as exc:
             print("Clip download or conversion failed:", type(exc).__name__)
         finally:
@@ -1329,19 +1335,25 @@ def build_video(fmt, meta, duration):
     total_words = sum(word_counts)
     visual_entries = []
     audit = []
+    used_clip_ids = set()
     for scene_no, (scene, count) in enumerate(zip(scenes, word_counts), 1):
         scene_duration = duration * count / total_words
+        previously_used = set(used_clip_ids)
         clips = fetch_clips(
-            scene["keywords"], fmt, scene_duration, W, H, topic=meta.get("topic")
+            scene["keywords"], fmt, scene_duration, W, H,
+            topic=meta.get("topic"),
+            used_ids=used_clip_ids,
+            segment_prefix=f"scene_{scene_no:02}_clip",
         )
         if not clips:
             raise RuntimeError(
-                f"No stock footage passed the relevance check for narration scene {scene_no}: "
-                f"{scene['keywords']}. Refusing unrelated filler footage."
+                f"No unused stock footage passed the relevance check for narration scene {scene_no}: "
+                f"{scene['keywords']}. Refusing repeated or unrelated filler footage."
             )
         audit.append({
             "scene": scene_no,
             "matched_clip_count": len(clips),
+            "source_ids": sorted(used_clip_ids - previously_used),
             "searches": list(scene["keywords"]),
         })
         scene_entries, covered, index = [], 0.0, 0
