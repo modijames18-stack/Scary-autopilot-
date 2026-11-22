@@ -84,6 +84,7 @@ LONG_HOURS = [int(h) for h in env("LONG_HOURS", "6,18").split(",") if h.strip()]
 YT_PRIVACY = env("YOUTUBE_PRIVACY", "private")  # switch to "public" once Google approves your app
 YT_DAILY_CAP = int(env("YOUTUBE_DAILY_UPLOADS", "8"))  # one upload per 3-hour run
 REPORT_HOUR = int(env("REPORT_HOUR_UTC", "21"))
+SCHEDULE_MINUTE = int(env("SCHEDULE_MINUTE", "17"))
 VOICE = env("TTS_VOICE", "en-US-ChristopherNeural")
 NOW = dt.datetime.utcnow()
 TODAY = NOW.strftime("%Y-%m-%d")
@@ -203,7 +204,8 @@ def ask_ai(system, prompt, max_tokens=4000, json_mode=False):
         return "".join(b.text for b in msg.content if b.type == "text")
 
     models = gemini_model_sequence()
-    attempts_per_model = max(1, min(3, int(env("GEMINI_ATTEMPTS_PER_MODEL", "2"))))
+    # One request per model by default limits free-tier consumption; model failover still runs.
+    attempts_per_model = max(1, min(3, int(env("GEMINI_ATTEMPTS_PER_MODEL", "1"))))
     timeout_seconds = max(15, min(180, int(env("GEMINI_TIMEOUT_SECONDS", "75"))))
     # Short scripts and scene plans do not need the old 6,000-token minimum.
     # Smaller output ceilings reduce latency and free-tier quota use.
@@ -646,7 +648,8 @@ Reply with ONLY a JSON object with these keys:
         verify_source_links(meta), expected_topic=topic, fmt=fmt
     )
 
-    if fmt == "short":
+    # A second editorial polish call is opt-in; deterministic quality gates still run by default.
+    if fmt == "short" and env("ENABLE_SCRIPT_POLISH").lower() == "true":
         try:
             better = ask_ai(
                 "You are a careful editor of short science and future-risk explainers.",
@@ -1661,12 +1664,29 @@ def verify_instagram_reel(media_id):
 
 
 # ---------------------------------------------------------------- 6. report
+def expected_schedule_slots_today(now=None):
+    """Return scheduled UTC slot times up to now for the 17-minute, 3-hour cadence."""
+    current = now or NOW
+    slots = []
+    for hour in range(0, 24, 3):
+        slot = current.replace(hour=hour, minute=SCHEDULE_MINUTE, second=0, microsecond=0)
+        if slot <= current:
+            slots.append(slot)
+    return slots
+
+
 def daily_report(hist):
     runs_today = [
         run for run in hist.get("runs", [])
         if str(run.get("time", "")).startswith(TODAY)
         and run.get("github_event", "schedule") == "schedule"
     ]
+    attempt_keys = {
+        str(run.get("github_run_id") or run.get("run_id") or f"legacy:{index}:{run.get('time', '')}")
+        for index, run in enumerate(runs_today)
+    }
+    attempts_recorded = len(attempt_keys)
+    missed_slots = max(0, len(expected_schedule_slots_today()) - attempts_recorded)
     generated_today = [run for run in runs_today if run.get("generated")]
     short_count = sum(1 for run in generated_today if run.get("format") == "short")
     youtube_count = sum(
@@ -1699,8 +1719,8 @@ def daily_report(hist):
     cancelled_runs = sum(1 for run in runs_today if run.get("status") in cancelled_statuses)
     lines = [
         f"📊 Daily report {TODAY}",
-        f"Scheduled attempts recorded: {len(runs_today)}; failures: {failed_runs}; "
-        f"cancelled/missed: {cancelled_runs}",
+        f"Scheduled attempts recorded: {attempts_recorded}; failures: {failed_runs}; "
+        f"cancelled: {cancelled_runs}; missed slots (estimated): {missed_slots}",
         f"Videos generated: {len(generated_today)} ({short_count} short, "
         f"{len(generated_today) - short_count} long)",
         f"Verified platform deliveries: YouTube {youtube_count}; Facebook {facebook_count}; "
@@ -1843,6 +1863,11 @@ def main():
         })
         save_history(hist)
         notify(f"❌ Video creation failed ({fmt}) at {stage}:\n{traceback.format_exc()[-1500:]}")
+        if NOW.hour == REPORT_HOUR:
+            try:
+                daily_report(hist)
+            except Exception as report_error:
+                print("Daily report after generation failure could not be sent:", type(report_error).__name__)
         raise SystemExit(1)
 
     record = {
