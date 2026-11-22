@@ -250,6 +250,35 @@ class DocumentaryQualityTests(unittest.TestCase):
             autopilot.ensure_viewer_question(meta, "short")
 
 
+
+class ScriptCallBudgetTests(unittest.TestCase):
+    def _write_script_call_count(self, polish_enabled):
+        meta = good_meta()
+        meta["visual_keywords"] = [
+            "river basin", "water monitoring", "reservoir", "groundwater",
+        ]
+        payload = json.dumps(meta)
+        settings = {"ENABLE_SCRIPT_POLISH": "true"} if polish_enabled else {}
+        with patch.dict("os.environ", settings, clear=True), \
+             patch.object(autopilot, "ask_ai", return_value=payload) as ask, \
+             patch.object(autopilot, "repair_short_script_length",
+                          side_effect=lambda value, topic: value), \
+             patch.object(autopilot, "verify_source_links", side_effect=lambda value: value), \
+             patch.object(autopilot, "validate_documentary_script",
+                          side_effect=lambda value, expected_topic, fmt: value):
+            result = autopilot.write_script(
+                "short", "audience notes", {"posts": [], "runs": []},
+                topic=TOPIC, include_visual_plan=False,
+            )
+        self.assertEqual(result["topic"], TOPIC)
+        return ask.call_count
+
+    def test_optional_polish_is_disabled_by_default_to_conserve_api_quota(self):
+        self.assertEqual(self._write_script_call_count(False), 1)
+
+    def test_optional_polish_remains_available_when_explicitly_enabled(self):
+        self.assertEqual(self._write_script_call_count(True), 2)
+
 class RunHistoryTests(unittest.TestCase):
     def test_github_run_context_is_persisted_without_secrets(self):
         with patch.dict("os.environ", {
@@ -294,14 +323,34 @@ class RunHistoryTests(unittest.TestCase):
                 },
             }],
         }
-        autopilot.daily_report(history)
+        with patch.object(autopilot, "NOW", autopilot.dt.datetime(2026, 11, 22, 9, 17)), \
+             patch.object(autopilot, "TODAY", "2026-11-22"):
+            autopilot.daily_report(history)
         report = notify.call_args.args[0]
         self.assertIn("Scheduled attempts recorded: 1", report)
+        self.assertIn("cancelled: 0; missed slots (estimated): 3", report)
         self.assertIn("Videos generated: 1 (1 short, 0 long)", report)
         self.assertIn(
             "Verified platform deliveries: YouTube 0; Facebook 0; Instagram 0; TikTok inbox 0",
             report,
         )
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_daily_report_is_sent_when_generation_fails_in_report_slot(self):
+        history = {"posts": [], "patterns": {}, "runs": []}
+        with patch.object(autopilot, "NOW", autopilot.dt.datetime(2026, 11, 22, 21, 17)), \
+             patch.object(autopilot, "REPORT_HOUR", 21), \
+             patch.object(autopilot, "load_history", return_value=history), \
+             patch.object(autopilot, "pick_format", return_value="short"), \
+             patch.object(autopilot, "choose_topic", return_value=TOPIC), \
+             patch.object(autopilot, "research", return_value="curated evidence"), \
+             patch.object(autopilot, "write_script", side_effect=RuntimeError("provider unavailable")), \
+             patch.object(autopilot, "save_history"), \
+             patch.object(autopilot, "notify"), \
+             patch.object(autopilot, "daily_report") as report:
+            with self.assertRaises(SystemExit):
+                autopilot.main()
+        report.assert_called_once_with(history)
 
     def test_no_platform_delivery_does_not_create_a_post_record(self):
         platforms = {

@@ -137,6 +137,20 @@ class GeminiFailoverTests(unittest.TestCase):
 
         post.assert_called_once()
 
+    @patch.dict("os.environ", {
+        "AI_PROVIDER": "gemini",
+        "GEMINI_API_KEY": "test-key",
+    }, clear=True)
+    @patch("autopilot.requests.post")
+    def test_default_attempts_per_model_is_one(self, post):
+        unavailable = Mock(ok=False, status_code=503, text="temporary server error")
+        post.return_value = unavailable
+
+        with self.assertRaisesRegex(RuntimeError, "unavailable"):
+            autopilot.ask_ai("system", "prompt")
+
+        # The primary and both configured fallbacks are each tried once.
+        self.assertEqual(post.call_count, 3)
 
     @patch.dict("os.environ", {}, clear=True)
     def test_default_model_sequence_includes_low_cost_tertiary_fallback(self):

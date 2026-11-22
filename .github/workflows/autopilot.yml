@@ -95,6 +95,7 @@ jobs:
           GEMINI_FALLBACK_MODELS: ${{ vars.GEMINI_FALLBACK_MODELS }}
           GEMINI_TIMEOUT_SECONDS: ${{ vars.GEMINI_TIMEOUT_SECONDS }}
           GEMINI_ATTEMPTS_PER_MODEL: ${{ vars.GEMINI_ATTEMPTS_PER_MODEL }}
+          ENABLE_SCRIPT_POLISH: ${{ vars.ENABLE_SCRIPT_POLISH }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
           YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
@@ -118,6 +119,7 @@ jobs:
           META_GRAPH_VERSION: ${{ vars.META_GRAPH_VERSION }}
           TTS_VOICE: ${{ vars.TTS_VOICE }}
           REPORT_HOUR_UTC: ${{ vars.REPORT_HOUR_UTC }}
+          SCHEDULE_MINUTE: "17"
           FORCE_FORMAT: ${{ github.event.inputs.force_format }}
           REPORT_ONLY: ${{ github.event.inputs.report_only }}
         run: python resilient_runner.py
