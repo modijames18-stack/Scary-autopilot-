@@ -1324,6 +1324,22 @@
       "platforms": {},
       "failed_stage": "script and evidence validation",
       "error": "Configured AI provider unavailable; safe documentary generation stopped. Gemini API request failed after bounded retries; inspect redacted workflow diagnostics."
+    },
+    {
+      "time": "2026-11-22T15:59:49Z",
+      "github_run_id": "45041255473",
+      "github_run_attempt": "1",
+      "github_event": "schedule",
+      "format": "short",
+      "topic": "Red or discolored rivers and harmful algal blooms",
+      "status": "generation_failed",
+      "generated": false,
+      "platforms": {},
+      "title": "Unlocking the Mystery of Discolored Rivers",
+      "source_count": 3,
+      "visual_scene_count": 7,
+      "failed_stage": "scene footage and rendering",
+      "error": "No unused stock footage passed the relevance check for narration scene 3: ['agricultural nutrient runoff river', 'warm lake algal bloom sampling']. Refusing repeated or unrelated filler footage."
     }
   ]
 }
