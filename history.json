@@ -1380,6 +1380,20 @@
       "failed_stage": "automated unit tests",
       "error": "Automated unit tests failed before generation.",
       "platforms": {}
+    },
+    {
+      "time": "2026-11-23T04:29:12Z",
+      "github_run_id": "45112029381",
+      "github_run_number": "119",
+      "github_run_attempt": "1",
+      "github_event": "schedule",
+      "format": "short",
+      "status": "workflow_failed_before_generation",
+      "generated": false,
+      "workflow_status": "failure",
+      "failed_stage": "automated unit tests",
+      "error": "Automated unit tests failed before generation.",
+      "platforms": {}
     }
   ]
 }
