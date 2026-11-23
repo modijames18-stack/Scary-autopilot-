@@ -307,10 +307,13 @@ class RunHistoryTests(unittest.TestCase):
     @patch.dict("os.environ", {}, clear=True)
     @patch.object(autopilot, "notify")
     def test_daily_report_counts_generated_runs_separately_from_posts(self, notify):
+        report_date = "2026-11-22"
         history = {
             "posts": [],
             "runs": [{
-                "time": f"{autopilot.TODAY}T09:00:00Z",
+                # Keep the fixture aligned with the date patched below; do not
+                # depend on the real calendar date when the suite is executed.
+                "time": f"{report_date}T09:00:00Z",
                 "github_event": "schedule",
                 "status": "completed_with_delivery_issues",
                 "generated": True,
@@ -324,7 +327,7 @@ class RunHistoryTests(unittest.TestCase):
             }],
         }
         with patch.object(autopilot, "NOW", autopilot.dt.datetime(2026, 11, 22, 9, 17)), \
-             patch.object(autopilot, "TODAY", "2026-11-22"):
+             patch.object(autopilot, "TODAY", report_date):
             autopilot.daily_report(history)
         report = notify.call_args.args[0]
         self.assertIn("Scheduled attempts recorded: 1", report)
