@@ -23,11 +23,23 @@ class WorkflowRunnerTests(unittest.TestCase):
     def test_schedule_runs_every_three_hours_away_from_hour_boundary(self):
         self.assertIn('cron: "17 */3 * * *"', self.content)
 
-    def test_media_installation_has_a_longer_retry_budget(self):
-        self.assertGreaterEqual(self.content.count("timeout 600s sudo apt-get"), 2)
-        self.assertIn("Acquire::Retries=3", self.content)
-        self.assertIn("Acquire::http::Timeout=30", self.content)
-        self.assertIn("Acquire::https::Timeout=30", self.content)
+    def test_media_installation_caches_packages_and_has_a_longer_retry_budget(self):
+        self.assertIn("uses: actions/cache@v4", self.content)
+        self.assertIn("path: ~/.cache/apt/archives", self.content)
+        self.assertIn("key: ubuntu-24.04-ffmpeg-${{ github.run_id }}", self.content)
+        self.assertIn("restore-keys: |", self.content)
+        self.assertIn("Dir::Cache::archives=", self.content)
+        self.assertIn("timeout 300s sudo apt-get", self.content)
+        self.assertIn("timeout 1800s sudo apt-get", self.content)
+        self.assertIn("Acquire::Retries=5", self.content)
+        self.assertIn("Acquire::http::Timeout=60", self.content)
+        self.assertIn("Acquire::https::Timeout=60", self.content)
+
+    def test_media_installation_checks_ffprobe_and_subtitle_support(self):
+        self.assertIn("command -v ffprobe", self.content)
+        self.assertIn("ffprobe -version | head -n 1", self.content)
+        self.assertIn("ffmpeg -hide_banner -filters | grep subtitles > /dev/null", self.content)
+        self.assertIn("trap 'sudo chown -R", self.content)
 
     def test_workflow_exports_each_stage_outcome_for_history(self):
         for step in (
