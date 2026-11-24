@@ -44,7 +44,9 @@ jobs:
         id: media_tools
         run: |
           mkdir -p "$HOME/.cache/apt/archives/partial"
-          chmod -R a+rwX "$HOME/.cache/apt/archives"
+          chmod 755 "$HOME/.cache/apt/archives"
+          chmod 777 "$HOME/.cache/apt/archives/partial"
+          trap 'sudo chown -R "$(id -u):$(id -g)" "$HOME/.cache/apt/archives" 2>/dev/null || true; chmod -R u+rwX,go+rX "$HOME/.cache/apt/archives" 2>/dev/null || true' EXIT
           needs_install=false
           command -v ffmpeg >/dev/null 2>&1 || needs_install=true
           command -v ffprobe >/dev/null 2>&1 || needs_install=true
@@ -55,10 +57,9 @@ jobs:
             timeout 300s sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=60 -o Acquire::https::Timeout=60 update
             timeout 1800s sudo apt-get -o Dir::Cache::archives="$HOME/.cache/apt/archives" -o Acquire::Retries=5 -o Acquire::http::Timeout=60 -o Acquire::https::Timeout=60 install -y --no-install-recommends ffmpeg fontconfig fonts-dejavu-core
           fi
-          sudo chown -R "$(id -u):$(id -g)" "$HOME/.cache/apt/archives"
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
-          ffmpeg -hide_banner -filters | grep -q subtitles
+          ffmpeg -hide_banner -filters | grep subtitles > /dev/null
           fc-match "DejaVu Sans"
 
       - name: Install Python packages
