@@ -38,7 +38,8 @@ class WorkflowRunnerTests(unittest.TestCase):
     def test_media_installation_checks_ffprobe_and_subtitle_support(self):
         self.assertIn("command -v ffprobe", self.content)
         self.assertIn("ffprobe -version | head -n 1", self.content)
-        self.assertIn("ffmpeg -hide_banner -filters | grep -q subtitles", self.content)
+        self.assertIn("ffmpeg -hide_banner -filters | grep subtitles > /dev/null", self.content)
+        self.assertIn("trap 'sudo chown -R", self.content)
 
     def test_workflow_exports_each_stage_outcome_for_history(self):
         for step in (
