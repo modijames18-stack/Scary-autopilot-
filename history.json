@@ -1486,6 +1486,20 @@
       "failed_stage": "runner media-tool installation",
       "error": "FFmpeg/font setup failed before video generation.",
       "platforms": {}
+    },
+    {
+      "time": "2026-11-24T04:29:33Z",
+      "github_run_id": "45325450220",
+      "github_run_number": "127",
+      "github_run_attempt": "1",
+      "github_event": "schedule",
+      "format": "short",
+      "status": "workflow_failed_before_generation",
+      "generated": false,
+      "workflow_status": "failure",
+      "failed_stage": "runner media-tool installation",
+      "error": "FFmpeg/font setup failed before video generation.",
+      "platforms": {}
     }
   ]
 }
