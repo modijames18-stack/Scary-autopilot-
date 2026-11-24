@@ -1565,6 +1565,116 @@
       "platforms": {},
       "failed_stage": "script and evidence validation",
       "error": "Configured AI provider unavailable; safe documentary generation stopped. Gemini API timed out after bounded retries. Check provider availability or configure ANTHROPIC_API_KEY with AI_PROVIDER=anthropic."
+    },
+    {
+      "time": "2026-11-24T22:14:57Z",
+      "github_run_id": "45498923936",
+      "github_run_attempt": "1",
+      "github_event": "schedule",
+      "format": "short",
+      "topic": "Ocean warming, sea-level rise and glacier loss",
+      "status": "completed_with_delivery_issues",
+      "generated": true,
+      "platforms": {
+        "youtube": {
+          "status": "skipped",
+          "reason": "upload switch is off"
+        },
+        "facebook": {
+          "status": "skipped",
+          "reason": "publishing switch is off"
+        },
+        "instagram": {
+          "status": "skipped",
+          "reason": "publishing switch is off"
+        },
+        "tiktok": {
+          "status": "skipped",
+          "reason": "inbox upload switch is off"
+        }
+      },
+      "title": "When the Tides Rise: Tracking Ocean Warming and Glacier Loss",
+      "source_count": 2,
+      "visual_scene_count": 6,
+      "video_file": "final_short.mp4",
+      "duration_seconds": 67.03,
+      "visual_clip_count": 13,
+      "visual_clip_audit": [
+        {
+          "scene": 1,
+          "matched_clip_count": 2,
+          "source_ids": [
+            "px160767",
+            "px85674"
+          ],
+          "searches": [
+            "coastal coastal community erosion ocean",
+            "underwater coral reef bleaching warming"
+          ]
+        },
+        {
+          "scene": 2,
+          "matched_clip_count": 3,
+          "source_ids": [
+            "px213424",
+            "px236893",
+            "px53906"
+          ],
+          "searches": [
+            "glacier loss ocean heat survey",
+            "glacier iceberg melting sea tide"
+          ]
+        },
+        {
+          "scene": 3,
+          "matched_clip_count": 3,
+          "source_ids": [
+            "px22619",
+            "px385163",
+            "px71122"
+          ],
+          "searches": [
+            "sea tide level rise coastal",
+            "glacier iceberg ice-sheet ocean"
+          ]
+        },
+        {
+          "scene": 4,
+          "matched_clip_count": 2,
+          "source_ids": [
+            "px217850",
+            "px365737"
+          ],
+          "searches": [
+            "coastal city ocean tide flood",
+            "iceberg ice-sheet glacier sea"
+          ]
+        },
+        {
+          "scene": 5,
+          "matched_clip_count": 2,
+          "source_ids": [
+            "px305896",
+            "px308897"
+          ],
+          "searches": [
+            "coastal resilience infrastructure seawall ocean",
+            "marine ecosystem underwater coral reef"
+          ]
+        },
+        {
+          "scene": 6,
+          "matched_clip_count": 1,
+          "source_ids": [
+            "px198488"
+          ],
+          "searches": [
+            "coastal community sea level rise",
+            "coastal seawall ocean tide adaptation"
+          ]
+        }
+      ],
+      "completed_at": "2026-11-24T22:17:45Z"
     }
   ]
 }
