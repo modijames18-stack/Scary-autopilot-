@@ -7,6 +7,7 @@ import autopilot
 
 WATER_TOPIC = "Water scarcity and drying rivers"
 INTERNET_TOPIC = "Internet infrastructure and global connectivity"
+OCEAN_TOPIC = "Ocean warming, sea-level rise and glacier loss"
 
 
 def water_narration():
@@ -311,6 +312,43 @@ class VisualPlanTests(unittest.TestCase):
         self.assertEqual(
             candidates,
             [("px2", "https://cdn.example/submarine-cable.mp4", 7.0)],
+        )
+
+
+    def test_pixabay_candidates_require_the_narrated_concrete_subject(self):
+        response = Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {
+            "hits": [
+                {
+                    "id": 1,
+                    "tags": "coastal coral reef ocean",
+                    "duration": 8,
+                    "videos": {"large": {"url": "https://cdn.example/coral-reef.mp4"}},
+                },
+                {
+                    "id": 2,
+                    "tags": "coastal seawall infrastructure ocean",
+                    "duration": 7,
+                    "videos": {"large": {"url": "https://cdn.example/seawall.mp4"}},
+                },
+            ]
+        }
+        with patch.dict("os.environ", {"PIXABAY_API_KEY": "test-key", "PEXELS_API_KEY": ""}, clear=True):
+            with patch("autopilot.requests.get", return_value=response):
+                candidates = autopilot.find_candidates(
+                    [
+                        "coastal resilience infrastructure seawall ocean",
+                        "marine ecosystem underwater coral reef",
+                    ],
+                    "short",
+                    720,
+                    topic=OCEAN_TOPIC,
+                    scene_text="We must invest in coastal infrastructure and seawall protection.",
+                )
+        self.assertEqual(
+            candidates,
+            [("px2", "https://cdn.example/seawall.mp4", 7.0)],
         )
 
     def test_pexels_fallback_requires_and_reads_page_subject_metadata(self):
