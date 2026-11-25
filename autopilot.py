@@ -530,6 +530,31 @@ GENERIC_VISUAL_TERMS = {
     "background", "scenery", "beautiful", "dark", "forest", "building",
     "technology", "documentary", "scene", "shot", "stock",
 }
+VISUAL_STOPWORDS = {
+    "a", "an", "and", "are", "as", "at", "be", "been", "before", "but", "by",
+    "can", "could", "did", "do", "does", "for", "from", "had", "has", "have",
+    "how", "if", "in", "into", "is", "it", "its", "may", "might", "more",
+    "most", "not", "of", "on", "or", "our", "out", "over", "should", "some",
+    "than", "that", "the", "their", "them", "then", "there", "these", "they",
+    "this", "those", "to", "under", "was", "were", "what", "when", "where",
+    "which", "who", "will", "with", "would", "you", "your",
+}
+VISUAL_ABSTRACT_TERMS = {
+    "change", "changes", "loss", "losses", "rise", "rising", "fall", "falling",
+    "decline", "declining", "increase", "increases", "increasing", "decrease",
+    "decreases", "decreasing", "warming", "heat", "temperature", "record",
+    "records", "survey", "monitor", "monitoring", "study", "studies", "report",
+    "reports", "evidence", "future", "global", "regional", "critical", "severe",
+    "faster", "fast", "slow", "risk", "risks", "impact", "impacts", "challenge",
+    "challenges", "solution", "solutions", "prepare", "preparing", "protect",
+    "protection", "consequence", "consequences", "likely", "unlikely", "need",
+    "needs", "needed", "must", "should", "invest", "investing", "scale",
+    "scaling", "reduce", "reducing", "cut", "cuts", "act", "action", "actions",
+    "help", "helps", "support", "supports", "ensure", "ensures", "ongoing",
+    "official", "confirms", "confirmed", "update", "updates", "year", "years",
+    "history", "observational", "hottest", "high", "higher", "low", "lower",
+    "ecosystem", "ecosystems", "displacement",
+}
 
 
 def choose_topic(hist):
@@ -1184,16 +1209,39 @@ def visual_tokens(value):
     }
 
 
-def stock_tags_match(tags, keyword, topic):
-    """Accept a clip only when its own metadata confirms two topic-specific query anchors."""
+def stock_tags_match(tags, keyword, topic, scene_text=None):
+    """Require topic anchors and, where possible, a visible subject from this narration scene."""
     if not tags or not keyword or not topic:
         return False
+    tag_terms = visual_tokens(tags)
+    keyword_terms = visual_tokens(keyword)
     anchors = visual_tokens(" ".join(TOPIC_VISUAL_ANCHORS.get(topic, set())))
-    matched = visual_tokens(tags) & visual_tokens(keyword) & anchors
-    return len(matched) >= 2
+    matched = tag_terms & keyword_terms & anchors
+    if len(matched) < 2:
+        return False
+
+    if scene_text:
+        scene_terms = (
+            visual_tokens(scene_text)
+            - VISUAL_STOPWORDS
+            - GENERIC_VISUAL_TERMS
+            - VISUAL_ABSTRACT_TERMS
+        )
+        if scene_terms:
+            scene_overlap = scene_terms & keyword_terms
+            if not scene_overlap:
+                return False
+            # If the narration/query share a concrete non-topic noun (for example
+            # "infrastructure" or "seawall"), the clip metadata must confirm it.
+            # Otherwise fall back to their shared topic anchors.
+            specific_terms = scene_overlap - anchors
+            required_terms = specific_terms or scene_overlap
+            if not (tag_terms & required_terms):
+                return False
+    return True
 
 
-def find_candidates(keywords, fmt, W, topic=None):
+def find_candidates(keywords, fmt, W, topic=None, scene_text=None):
     """Search stock footage, rejecting results whose returned metadata is not topic-specific."""
     per_kw = []
     pix, pex = env("PIXABAY_API_KEY"), env("PEXELS_API_KEY")
@@ -1209,7 +1257,7 @@ def find_candidates(keywords, fmt, W, topic=None):
                 )
                 r.raise_for_status()
                 for hit in r.json().get("hits", []):
-                    if not stock_tags_match(hit.get("tags", ""), kw, topic):
+                    if not stock_tags_match(hit.get("tags", ""), kw, topic, scene_text=scene_text):
                         rejected += 1
                         continue
                     videos = hit.get("videos", {})
@@ -1233,7 +1281,7 @@ def find_candidates(keywords, fmt, W, topic=None):
                         str(video.get(field, ""))
                         for field in ("tags", "title", "description", "name")
                     )
-                    if not stock_tags_match(metadata, kw, topic):
+                    if not stock_tags_match(metadata, kw, topic, scene_text=scene_text):
                         page_url = str(video.get("url", ""))
                         if page_url.startswith("https://www.pexels.com/video/"):
                             try:
@@ -1257,7 +1305,7 @@ def find_candidates(keywords, fmt, W, topic=None):
                                     metadata += " " + html.unescape(" ".join(meta_values + title_values))
                             except Exception as exc:
                                 print("Pexels clip metadata check unavailable:", type(exc).__name__)
-                    if not stock_tags_match(metadata, kw, topic):
+                    if not stock_tags_match(metadata, kw, topic, scene_text=scene_text):
                         rejected += 1
                         continue
                     files = [
@@ -1290,10 +1338,10 @@ def find_candidates(keywords, fmt, W, topic=None):
     return candidates
 
 
-def fetch_clips(keywords, fmt, need, W, H, topic=None, used_ids=None, segment_prefix="seg"):
-    """Fetch relevant clips with unique filenames and optional cross-scene source exclusion."""
+def fetch_clips(keywords, fmt, need, W, H, topic=None, used_ids=None, segment_prefix="seg", scene_text=None):
+    """Fetch relevant clips with unique filenames and narration-scene subject checks."""
     max_clips = 12 if fmt == "short" else 36
-    order = find_candidates(keywords, fmt, W, topic=topic)
+    order = find_candidates(keywords, fmt, W, topic=topic, scene_text=scene_text)
     clips, seen, total = [], set(), 0.0
     used_ids = used_ids if used_ids is not None else set()
     for vid_id, link, vdur in order:
@@ -1347,6 +1395,7 @@ def build_video(fmt, meta, duration):
             topic=meta.get("topic"),
             used_ids=used_clip_ids,
             segment_prefix=f"scene_{scene_no:02}_clip",
+            scene_text=scene["text"],
         )
         if not clips:
             raise RuntimeError(

@@ -66,8 +66,8 @@ class FootageDiversityTests(unittest.TestCase):
         calls = []
 
         def fake_fetch(keywords, fmt, need, width, height, topic=None,
-                       used_ids=None, segment_prefix="seg"):
-            calls.append((segment_prefix, used_ids))
+                       used_ids=None, segment_prefix="seg", scene_text=None):
+            calls.append((segment_prefix, used_ids, scene_text))
             source_id = "px1" if len(calls) == 1 else "px2"
             if len(calls) > 1:
                 self.assertIn("px1", used_ids)
@@ -91,6 +91,8 @@ class FootageDiversityTests(unittest.TestCase):
 
         self.assertEqual(calls[0][0], "scene_01_clip")
         self.assertEqual(calls[1][0], "scene_02_clip")
+        self.assertEqual(calls[0][2], "First narration sentence.")
+        self.assertEqual(calls[1][2], "Second narration sentence.")
         self.assertIs(calls[0][1], calls[1][1])
         self.assertIn("scene_01_clip_00.mp4", scene_one)
         self.assertIn("scene_02_clip_00.mp4", scene_two)
