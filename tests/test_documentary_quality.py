@@ -131,7 +131,7 @@ class DocumentaryQualityTests(unittest.TestCase):
             "and climate pressure can push some rivers and aquifers into severe stress. ",
             "",
         )
-        count = len(re.findall(r"\\b[\\w’'-]+\\b", meta["narration"]))
+        count = len(re.findall(r"\b[\w’'-]+\b", meta["narration"]))
         self.assertGreaterEqual(count, 110)
         self.assertLessEqual(count, 160)
         with patch.object(autopilot, "ask_ai") as ask:
