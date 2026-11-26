@@ -124,6 +124,21 @@ class DocumentaryQualityTests(unittest.TestCase):
         self.assertIs(result, meta)
         ask.assert_not_called()
 
+    def test_short_script_length_repair_skips_ai_within_validator_bounds(self):
+        meta = good_meta()
+        meta["narration"] = meta["narration"].replace(
+            "The UNU-INWEH warns that overuse, pollution "
+            "and climate pressure can push some rivers and aquifers into severe stress. ",
+            "",
+        )
+        count = len(re.findall(r"\\b[\\w’'-]+\\b", meta["narration"]))
+        self.assertGreaterEqual(count, 110)
+        self.assertLessEqual(count, 160)
+        with patch.object(autopilot, "ask_ai") as ask:
+            result = autopilot.repair_short_script_length(meta, TOPIC)
+        self.assertIs(result, meta)
+        ask.assert_not_called()
+
     def test_rejects_topic_drift(self):
         meta = good_meta()
         meta["topic"] = "AI and jobs"
