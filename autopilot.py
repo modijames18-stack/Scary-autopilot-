@@ -934,7 +934,10 @@ def repair_short_script_length(meta, topic):
     """Repair only short-script length; preserve the original curated sources and metadata."""
     narration = str(meta.get("narration", "")).strip()
     count = len(re.findall(r"\b[\w’'-]+\b", narration))
-    if 125 <= count <= 145:
+    # Match the deterministic validator's accepted short-script range. A second
+    # model call is unnecessary when the first script is already publishable; avoid
+    # turning a valid script into a failed run during temporary provider outages.
+    if 110 <= count <= 160:
         return meta
 
     raw = ask_ai(
