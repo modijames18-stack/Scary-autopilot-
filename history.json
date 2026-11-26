@@ -1818,6 +1818,19 @@
       "platforms": {},
       "failed_stage": "script and evidence validation",
       "error": "Configured AI provider unavailable; safe documentary generation stopped. Gemini API request failed after bounded retries; inspect redacted workflow diagnostics."
+    },
+    {
+      "time": "2026-11-26T10:27:24Z",
+      "github_run_id": "45801375240",
+      "github_run_attempt": "1",
+      "github_event": "schedule",
+      "format": "short",
+      "topic": "Internet infrastructure and global connectivity",
+      "status": "generation_failed",
+      "generated": false,
+      "platforms": {},
+      "failed_stage": "script and evidence validation",
+      "error": "Configured AI provider unavailable; safe documentary generation stopped. Gemini API request failed after bounded retries; inspect redacted workflow diagnostics."
     }
   ]
 }
