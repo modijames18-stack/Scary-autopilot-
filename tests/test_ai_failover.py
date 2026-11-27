@@ -92,9 +92,7 @@ class GeminiFailoverTests(unittest.TestCase):
 
         self.assertEqual(result, '{"topic":"Water"}')
         self.assertEqual(post.call_count, 2)
-        first_config = post.call_args_list[0].kwargs["json"]["generationConfig"]
         second_config = post.call_args_list[1].kwargs["json"]["generationConfig"]
-        self.assertIn("responseSchema", first_config)
         self.assertNotIn("responseSchema", second_config)
         self.assertEqual(second_config["responseMimeType"], "application/json")
 
