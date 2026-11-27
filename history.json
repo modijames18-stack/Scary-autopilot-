@@ -1922,6 +1922,22 @@
       "platforms": {},
       "failed_stage": "script and evidence validation",
       "error": "The opening must not contain a long unlabelled story before FACT."
+    },
+    {
+      "time": "2026-11-27T10:24:41Z",
+      "github_run_id": "45981774629",
+      "github_run_attempt": "1",
+      "github_event": "schedule",
+      "format": "short",
+      "topic": "Air pollution and health",
+      "status": "generation_failed",
+      "generated": false,
+      "platforms": {},
+      "title": "Invisible Threat: How Air Pollution Impacts the Human Body",
+      "source_count": 3,
+      "visual_scene_count": 6,
+      "failed_stage": "scene footage and rendering",
+      "error": "No unused stock footage passed the relevance check for narration scene 6: ['urban pedestrian street air quality', 'community air pollution monitor city', 'pedestrian commuter street air clean']. Refusing repeated or unrelated filler footage."
     }
   ]
 }
