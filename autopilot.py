@@ -193,7 +193,7 @@ def gemini_model_sequence():
     return models
 
 
-def ask_ai(system, prompt, max_tokens=4000, json_mode=False):
+def ask_ai(system, prompt, max_tokens=4000, json_mode=False, response_schema=None):
     """Use the configured writer; bound Gemini retries and fail over without weakening checks."""
     if ai_provider() == "anthropic":
         client = anthropic.Anthropic(api_key=env("ANTHROPIC_API_KEY"))
@@ -212,6 +212,8 @@ def ask_ai(system, prompt, max_tokens=4000, json_mode=False):
     gen = {"maxOutputTokens": max(int(max_tokens), 512), "temperature": 1.0}
     if json_mode:
         gen["responseMimeType"] = "application/json"
+        if response_schema is not None:
+            gen["responseSchema"] = response_schema
     headers = {"x-goog-api-key": env("GEMINI_API_KEY"), "Content-Type": "application/json"}
     failures = []
 
@@ -237,10 +239,34 @@ def ask_ai(system, prompt, max_tokens=4000, json_mode=False):
                 continue
 
             if response.status_code == 400 and thinking_enabled and "thinking" in response.text.lower():
-                body["generationConfig"] = gen
+                body["generationConfig"] = dict(gen)
+                if response_schema is not None and json_mode:
+                    body["generationConfig"]["responseSchema"] = response_schema
                 thinking_enabled = False
                 print(f"Gemini {model} does not accept thinkingConfig; retrying without it.")
                 continue
+
+            if response.status_code == 400 and "responseSchema" in body["generationConfig"]:
+                error_text = str(response.text).lower()
+                if "schema" in error_text or "json mode" in error_text:
+                    body["generationConfig"].pop("responseSchema", None)
+                    print(
+                        f"Gemini {model} rejected responseSchema; retrying JSON mode "
+                        "without the optional schema constraint."
+                    )
+                    try:
+                        response = requests.post(
+                            url, headers=headers, json=body, timeout=timeout_seconds
+                        )
+                    except requests.exceptions.RequestException as exc:
+                        reason = f"schema fallback network error: {type(exc).__name__}"
+                        failures.append(f"{model}: {reason}")
+                        print(f"Gemini {model} {reason}")
+                        break
+                    if response.status_code == 400:
+                        failures.append(f"{model}: JSON mode rejected after schema fallback")
+                        print(f"Gemini {model} rejected JSON mode after schema fallback.")
+                        break
 
             if response.status_code in (408, 429, 500, 502, 503, 504):
                 response_text = str(getattr(response, "text", "")).lower()
@@ -582,6 +608,36 @@ def choose_topic(hist):
 
 
 # ---------------------------------------------------------------- 2. script
+def documentary_script_response_schema():
+    """Compact structured-output schema for documentary metadata."""
+    return {
+        "type": "OBJECT",
+        "properties": {
+            "topic": {"type": "STRING"},
+            "title": {"type": "STRING"},
+            "description": {"type": "STRING"},
+            "tags": {"type": "ARRAY", "items": {"type": "STRING"}},
+            "narration": {"type": "STRING"},
+            "visual_keywords": {"type": "ARRAY", "items": {"type": "STRING"}},
+            "sources": {
+                "type": "ARRAY",
+                "items": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "title": {"type": "STRING"},
+                        "url": {"type": "STRING"},
+                        "supports": {"type": "STRING"},
+                    },
+                    "required": ["title", "url", "supports"],
+                },
+            },
+        },
+        "required": [
+            "topic", "title", "description", "tags",
+            "narration", "visual_keywords", "sources",
+        ],
+    }
+
 def write_script(fmt, patterns, hist, topic=None, include_visual_plan=True):
     topic = topic or choose_topic(hist)
     if topic not in TOPICS:
@@ -664,6 +720,7 @@ Reply with ONLY a JSON object with these keys:
         "You are an investigative science communicator and future-risk documentary writer. "
         "Be compelling, evidence-aware, balanced, and solution-focused.",
         prompt, max_tokens=1200 if fmt == "short" else 5000, json_mode=True,
+        response_schema=documentary_script_response_schema(),
     )
     meta = parse_meta(raw)
     if fmt == "short":
