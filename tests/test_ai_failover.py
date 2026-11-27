@@ -44,6 +44,68 @@ class GeminiFailoverTests(unittest.TestCase):
         "GEMINI_ATTEMPTS_PER_MODEL": "1",
     }, clear=True)
     @patch("autopilot.requests.post")
+    def test_json_response_schema_is_sent_when_requested(self, post):
+        success = Mock(ok=True, status_code=200)
+        success.json.return_value = {
+            "candidates": [{"content": {"parts": [{"text": '{"topic":"Water"}'}]}}]
+        }
+        post.return_value = success
+        schema = {
+            "type": "OBJECT",
+            "properties": {"topic": {"type": "STRING"}},
+            "required": ["topic"],
+        }
+
+        result = autopilot.ask_ai(
+            "system", "prompt", json_mode=True, response_schema=schema
+        )
+
+        self.assertEqual(result, '{"topic":"Water"}')
+        generation = post.call_args.kwargs["json"]["generationConfig"]
+        self.assertEqual(generation["responseMimeType"], "application/json")
+        self.assertEqual(generation["responseSchema"], schema)
+
+    @patch.dict("os.environ", {
+        "AI_PROVIDER": "gemini",
+        "GEMINI_API_KEY": "test-key",
+        "GEMINI_MODEL": "gemini-primary",
+        "GEMINI_FALLBACK_MODELS": "gemini-fallback",
+        "GEMINI_ATTEMPTS_PER_MODEL": "1",
+    }, clear=True)
+    @patch("autopilot.requests.post")
+    def test_unsupported_response_schema_retries_without_schema(self, post):
+        rejected = Mock(ok=False, status_code=400, text="responseSchema is not supported")
+        success = Mock(ok=True, status_code=200)
+        success.json.return_value = {
+            "candidates": [{"content": {"parts": [{"text": '{"topic":"Water"}'}]}}]
+        }
+        post.side_effect = [rejected, success]
+        schema = {
+            "type": "OBJECT",
+            "properties": {"topic": {"type": "STRING"}},
+            "required": ["topic"],
+        }
+
+        result = autopilot.ask_ai(
+            "system", "prompt", json_mode=True, response_schema=schema
+        )
+
+        self.assertEqual(result, '{"topic":"Water"}')
+        self.assertEqual(post.call_count, 2)
+        first_config = post.call_args_list[0].kwargs["json"]["generationConfig"]
+        second_config = post.call_args_list[1].kwargs["json"]["generationConfig"]
+        self.assertIn("responseSchema", first_config)
+        self.assertNotIn("responseSchema", second_config)
+        self.assertEqual(second_config["responseMimeType"], "application/json")
+
+    @patch.dict("os.environ", {
+        "AI_PROVIDER": "gemini",
+        "GEMINI_API_KEY": "test-key",
+        "GEMINI_MODEL": "gemini-primary",
+        "GEMINI_FALLBACK_MODELS": "gemini-fallback",
+        "GEMINI_ATTEMPTS_PER_MODEL": "1",
+    }, clear=True)
+    @patch("autopilot.requests.post")
     def test_non_json_primary_response_uses_configured_fallback(self, post):
         malformed = Mock(ok=True, status_code=200)
         malformed.json.return_value = {
