@@ -254,7 +254,19 @@ def ask_ai(system, prompt, max_tokens=4000, json_mode=False, response_schema=Non
                         f"Gemini {model} rejected responseSchema; retrying JSON mode "
                         "without the optional schema constraint."
                     )
-                    continue
+                    try:
+                        response = requests.post(
+                            url, headers=headers, json=body, timeout=timeout_seconds
+                        )
+                    except requests.exceptions.RequestException as exc:
+                        reason = f"schema fallback network error: {type(exc).__name__}"
+                        failures.append(f"{model}: {reason}")
+                        print(f"Gemini {model} {reason}")
+                        break
+                    if response.status_code == 400:
+                        failures.append(f"{model}: JSON mode rejected after schema fallback")
+                        print(f"Gemini {model} rejected JSON mode after schema fallback.")
+                        break
 
             if response.status_code in (408, 429, 500, 502, 503, 504):
                 response_text = str(getattr(response, "text", "")).lower()
