@@ -79,22 +79,27 @@ class GeminiFailoverTests(unittest.TestCase):
         success.json.return_value = {
             "candidates": [{"content": {"parts": [{"text": '{"topic":"Water"}'}]}}]
         }
-        post.side_effect = [rejected, success]
         schema = {
             "type": "OBJECT",
             "properties": {"topic": {"type": "STRING"}},
             "required": ["topic"],
         }
+        seen_configs = []
 
+        def respond(_url, **kwargs):
+            seen_configs.append(dict(kwargs["json"]["generationConfig"]))
+            return rejected if len(seen_configs) == 1 else success
+
+        post.side_effect = respond
         result = autopilot.ask_ai(
             "system", "prompt", json_mode=True, response_schema=schema
         )
 
         self.assertEqual(result, '{"topic":"Water"}')
         self.assertEqual(post.call_count, 2)
-        second_config = post.call_args_list[1].kwargs["json"]["generationConfig"]
-        self.assertNotIn("responseSchema", second_config)
-        self.assertEqual(second_config["responseMimeType"], "application/json")
+        self.assertIn("responseSchema", seen_configs[0])
+        self.assertNotIn("responseSchema", seen_configs[1])
+        self.assertEqual(seen_configs[1]["responseMimeType"], "application/json")
 
     @patch.dict("os.environ", {
         "AI_PROVIDER": "gemini",
