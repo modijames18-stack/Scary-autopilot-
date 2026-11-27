@@ -1938,6 +1938,22 @@
       "visual_scene_count": 6,
       "failed_stage": "scene footage and rendering",
       "error": "No unused stock footage passed the relevance check for narration scene 6: ['urban pedestrian street air quality', 'community air pollution monitor city', 'pedestrian commuter street air clean']. Refusing repeated or unrelated filler footage."
+    },
+    {
+      "time": "2026-11-27T13:36:14Z",
+      "github_run_id": "46008451940",
+      "github_run_attempt": "1",
+      "github_event": "schedule",
+      "format": "short",
+      "topic": "Internet infrastructure and global connectivity",
+      "status": "generation_failed",
+      "generated": false,
+      "platforms": {},
+      "title": "Submarine Cables: The Fragile Lifelines of Global Data",
+      "source_count": 3,
+      "visual_scene_count": 6,
+      "failed_stage": "scene footage and rendering",
+      "error": "No unused stock footage passed the relevance check for narration scene 1: ['undersea cable severed underwater', 'broken fiber optic cable ocean bed', 'damaged submarine telecom cable']. Refusing repeated or unrelated filler footage."
     }
   ]
 }
