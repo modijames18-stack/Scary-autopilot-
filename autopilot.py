@@ -1784,6 +1784,18 @@ def expected_schedule_slots_today(now=None):
     return slots
 
 
+def is_report_slot(now=None):
+    """Match the configured report slot even when GitHub starts the run late."""
+    current = now or NOW
+    report_slot = current.replace(
+        hour=REPORT_HOUR, minute=SCHEDULE_MINUTE, second=0, microsecond=0
+    )
+    if current < report_slot:
+        report_slot -= dt.timedelta(days=1)
+    elapsed = current - report_slot
+    return dt.timedelta(0) <= elapsed < dt.timedelta(hours=3)
+
+
 def daily_report(hist):
     runs_today = [
         run for run in hist.get("runs", [])
@@ -1972,7 +1984,7 @@ def main():
         })
         save_history(hist)
         notify(f"❌ Video creation failed ({fmt}) at {stage}:\n{traceback.format_exc()[-1500:]}")
-        if NOW.hour == REPORT_HOUR:
+        if is_report_slot():
             try:
                 daily_report(hist)
             except Exception as report_error:
@@ -2111,7 +2123,7 @@ def main():
     save_history(hist)
     notify(f"✅ New {fmt} documentary: {meta['title']}\n" + "\n".join(msgs))
 
-    if NOW.hour == REPORT_HOUR:
+    if is_report_slot():
         daily_report(hist)
 
 
