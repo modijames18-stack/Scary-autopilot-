@@ -356,8 +356,9 @@ class RunHistoryTests(unittest.TestCase):
     @patch.dict("os.environ", {}, clear=True)
     def test_daily_report_is_sent_when_generation_fails_in_report_slot(self):
         history = {"posts": [], "patterns": {}, "runs": []}
-        with patch.object(autopilot, "NOW", autopilot.dt.datetime(2026, 11, 22, 21, 17)), \
+        with patch.object(autopilot, "NOW", autopilot.dt.datetime(2026, 11, 22, 22, 12)), \
              patch.object(autopilot, "REPORT_HOUR", 21), \
+             patch.object(autopilot, "SCHEDULE_MINUTE", 17), \
              patch.object(autopilot, "load_history", return_value=history), \
              patch.object(autopilot, "pick_format", return_value="short"), \
              patch.object(autopilot, "choose_topic", return_value=TOPIC), \
@@ -369,6 +370,16 @@ class RunHistoryTests(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 autopilot.main()
         report.assert_called_once_with(history)
+
+    def test_report_slot_detection_tolerates_github_delay_without_duplicate_next_slot(self):
+        with patch.object(autopilot, "REPORT_HOUR", 21), \
+             patch.object(autopilot, "SCHEDULE_MINUTE", 17):
+            self.assertTrue(
+                autopilot.is_report_slot(autopilot.dt.datetime(2026, 11, 22, 22, 12))
+            )
+            self.assertFalse(
+                autopilot.is_report_slot(autopilot.dt.datetime(2026, 11, 23, 0, 17))
+            )
 
     def test_no_platform_delivery_does_not_create_a_post_record(self):
         platforms = {
