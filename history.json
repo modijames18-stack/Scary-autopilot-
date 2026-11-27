@@ -1967,6 +1967,122 @@
       "platforms": {},
       "failed_stage": "script and evidence validation",
       "error": "WHAT-IF section must explicitly identify its scenario as hypothetical."
+    },
+    {
+      "time": "2026-11-27T19:17:21Z",
+      "github_run_id": "46055543251",
+      "github_run_attempt": "1",
+      "github_event": "schedule",
+      "format": "short",
+      "topic": "Water scarcity and drying rivers",
+      "status": "completed_with_delivery_issues",
+      "generated": true,
+      "platforms": {
+        "youtube": {
+          "status": "skipped",
+          "reason": "upload switch is off"
+        },
+        "facebook": {
+          "status": "skipped",
+          "reason": "publishing switch is off"
+        },
+        "instagram": {
+          "status": "skipped",
+          "reason": "publishing switch is off"
+        },
+        "tiktok": {
+          "status": "skipped",
+          "reason": "inbox upload switch is off"
+        }
+      },
+      "title": "When the Tides Recede: Investigating Global Water Stress",
+      "source_count": 3,
+      "visual_scene_count": 6,
+      "video_file": "final_short.mp4",
+      "duration_seconds": 69.36,
+      "visual_clip_count": 13,
+      "visual_clip_audit": [
+        {
+          "scene": 1,
+          "matched_clip_count": 2,
+          "source_ids": [
+            "px358693",
+            "px95105"
+          ],
+          "searches": [
+            "dry river bed crack",
+            "dry tap low water river",
+            "reservoir low water level"
+          ]
+        },
+        {
+          "scene": 2,
+          "matched_clip_count": 3,
+          "source_ids": [
+            "px147074",
+            "px147075",
+            "px23205"
+          ],
+          "searches": [
+            "groundwater well drilling farmer",
+            "groundwater depletion dry well",
+            "farmer water pump drought"
+          ]
+        },
+        {
+          "scene": 3,
+          "matched_clip_count": 3,
+          "source_ids": [
+            "px217551",
+            "px244008",
+            "px378675"
+          ],
+          "searches": [
+            "crop irrigation field dry",
+            "wetland ecosystem water monitor",
+            "agricultural crop drought stress"
+          ]
+        },
+        {
+          "scene": 4,
+          "matched_clip_count": 1,
+          "source_ids": [
+            "px282083"
+          ],
+          "searches": [
+            "crop field dry drought farmer",
+            "irrigation canal dry crop field",
+            "agricultural crop failure dry water canal"
+          ]
+        },
+        {
+          "scene": 5,
+          "matched_clip_count": 2,
+          "source_ids": [
+            "px44765",
+            "px44767"
+          ],
+          "searches": [
+            "irrigation efficiency crop farm",
+            "watershed wetland ecosystem protection",
+            "canal irrigation water flow farmer"
+          ]
+        },
+        {
+          "scene": 6,
+          "matched_clip_count": 2,
+          "source_ids": [
+            "px137929",
+            "px76367"
+          ],
+          "searches": [
+            "water monitor river sampling",
+            "reservoir dam water level monitor",
+            "well water sampling groundwater"
+          ]
+        }
+      ],
+      "completed_at": "2026-11-27T19:22:21Z"
     }
   ]
 }
