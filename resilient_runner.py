@@ -6,9 +6,9 @@ stop the run rather than creating an unsourced or fictional replacement story.
 import autopilot as app
 
 
-def _resilient_ai(system, prompt, max_tokens=4000, json_mode=False):
+def _resilient_ai(system, prompt, max_tokens=4000, json_mode=False, response_schema=None):
     try:
-        return _network_ai(system, prompt, max_tokens=max_tokens, json_mode=json_mode)
+        return _network_ai(system, prompt, max_tokens=max_tokens, json_mode=json_mode, response_schema=response_schema)
     except Exception as exc:
         detail = app.safe_ai_error_summary(exc)
         print("AI provider unavailable; refusing to generate an unsourced documentary:", detail)
