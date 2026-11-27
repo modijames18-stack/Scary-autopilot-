@@ -1954,6 +1954,19 @@
       "visual_scene_count": 6,
       "failed_stage": "scene footage and rendering",
       "error": "No unused stock footage passed the relevance check for narration scene 1: ['undersea cable severed underwater', 'broken fiber optic cable ocean bed', 'damaged submarine telecom cable']. Refusing repeated or unrelated filler footage."
+    },
+    {
+      "time": "2026-11-27T16:21:58Z",
+      "github_run_id": "46032917780",
+      "github_run_attempt": "1",
+      "github_event": "schedule",
+      "format": "short",
+      "topic": "Red or discolored rivers and harmful algal blooms",
+      "status": "generation_failed",
+      "generated": false,
+      "platforms": {},
+      "failed_stage": "script and evidence validation",
+      "error": "WHAT-IF section must explicitly identify its scenario as hypothetical."
     }
   ]
 }
