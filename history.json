@@ -2177,6 +2177,22 @@
       "platforms": {},
       "failed_stage": "scene planning",
       "error": "Scene planning could not complete safely: Gemini API timed out after bounded retries. Check provider availability or configure ANTHROPIC_API_KEY with AI_PROVIDER=anthropic."
+    },
+    {
+      "time": "2026-11-28T19:13:21Z",
+      "github_run_id": "46179983620",
+      "github_run_attempt": "1",
+      "github_event": "schedule",
+      "format": "short",
+      "topic": "Red or discolored rivers and harmful algal blooms",
+      "status": "generation_failed",
+      "generated": false,
+      "platforms": {},
+      "title": "Why Are Entire Rivers Turning Crimson?",
+      "source_count": 3,
+      "visual_scene_count": 7,
+      "failed_stage": "scene footage and rendering",
+      "error": "No unused stock footage passed the relevance check for narration scene 2: ['harmful algal bloom river monitoring', 'mineral runoff water testing riverbank']. Refusing repeated or unrelated filler footage."
     }
   ]
 }
