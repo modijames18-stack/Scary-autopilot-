@@ -2138,6 +2138,19 @@
       "platforms": {},
       "failed_stage": "scene planning",
       "error": "Scene planning could not complete safely: Gemini API request failed after bounded retries; inspect redacted workflow diagnostics."
+    },
+    {
+      "time": "2026-11-28T10:08:20Z",
+      "github_run_id": "46133665005",
+      "github_run_attempt": "1",
+      "github_event": "schedule",
+      "format": "short",
+      "topic": "Global AI governance and concentration of power",
+      "status": "generation_failed",
+      "generated": false,
+      "platforms": {},
+      "failed_stage": "script and evidence validation",
+      "error": "Configured AI provider unavailable; safe documentary generation stopped. Gemini API timed out after bounded retries. Check provider availability or configure ANTHROPIC_API_KEY with AI_PROVIDER=anthropic."
     }
   ]
 }
