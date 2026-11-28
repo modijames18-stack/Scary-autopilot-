@@ -1507,6 +1507,43 @@ def build_video(fmt, meta, duration):
     return WORK / output
 
 
+def write_episode_review_manifest(meta, fmt, duration, video):
+    """Persist the exact script, evidence and scene-to-footage audit beside each MP4."""
+    scenes = []
+    for index, scene in enumerate(meta.get("visual_scenes", []), 1):
+        scenes.append({
+            "scene": index,
+            "narration": str(scene.get("text", "")),
+            "search_keywords": list(scene.get("keywords", [])),
+        })
+    manifest = {
+        "schema_version": 1,
+        "format": fmt,
+        "title": str(meta.get("title", "")),
+        "topic": str(meta.get("topic", "")),
+        "description": str(meta.get("description", "")),
+        "tags": list(meta.get("tags", [])),
+        "narration": str(meta.get("narration", "")),
+        "sources": [
+            {
+                "title": str(source.get("title", "")),
+                "url": str(source.get("url", "")),
+                "supports": str(source.get("supports", "")),
+            }
+            for source in meta.get("sources", [])
+            if isinstance(source, dict)
+        ],
+        "visual_scenes": scenes,
+        "visual_clip_audit": list(meta.get("visual_clip_audit", [])),
+        "video_file": Path(video).name,
+        "captions_file": "captions.srt",
+        "duration_seconds": round(float(duration), 2),
+    }
+    path = WORK / "episode_review.json"
+    path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return path
+
+
 # ---------------------------------------------------------------- 5. publish
 def hashtags(meta, fmt):
     tags = ["#future", "#technology", "#science", "#solutions"] + (["#shorts"] if fmt == "short" else [])
@@ -1966,11 +2003,14 @@ def main():
 
         stage = "scene footage and rendering"
         video = build_video(fmt, meta, duration)
+        review_manifest = write_episode_review_manifest(meta, fmt, duration, video)
         clip_audit = meta.get("visual_clip_audit", [])
         run_record.update({
             "generated": True,
             "status": "generated",
             "video_file": video.name,
+            "review_manifest_file": review_manifest.name,
+            "captions_file": "captions.srt",
             "duration_seconds": round(duration, 2),
             "visual_clip_count": sum(item.get("matched_clip_count", 0) for item in clip_audit),
             "visual_clip_audit": clip_audit,
