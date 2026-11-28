@@ -2164,6 +2164,19 @@
       "platforms": {},
       "failed_stage": "scene planning",
       "error": "Scene planning could not complete safely: Gemini API request failed after bounded retries; inspect redacted workflow diagnostics."
+    },
+    {
+      "time": "2026-11-28T16:03:36Z",
+      "github_run_id": "46163060917",
+      "github_run_attempt": "1",
+      "github_event": "schedule",
+      "format": "short",
+      "topic": "Internet infrastructure and global connectivity",
+      "status": "generation_failed",
+      "generated": false,
+      "platforms": {},
+      "failed_stage": "scene planning",
+      "error": "Scene planning could not complete safely: Gemini API timed out after bounded retries. Check provider availability or configure ANTHROPIC_API_KEY with AI_PROVIDER=anthropic."
     }
   ]
 }
