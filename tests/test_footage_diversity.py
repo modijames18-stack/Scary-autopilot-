@@ -1,4 +1,5 @@
 """Tests that stock clips remain unique and scene files cannot overwrite each other."""
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -99,6 +100,39 @@ class FootageDiversityTests(unittest.TestCase):
         self.assertEqual(meta["visual_clip_audit"][0]["source_ids"], ["px1"])
         self.assertEqual(meta["visual_clip_audit"][1]["source_ids"], ["px2"])
 
+    def test_episode_review_manifest_preserves_script_sources_scenes_and_caption_reference(self):
+        meta = {
+            "title": "A Water Stress Investigation",
+            "topic": "Water scarcity and drying rivers",
+            "description": "An evidence-led investigation.",
+            "tags": ["water", "climate"],
+            "narration": "FACT: A documented claim. FORECAST: A qualified risk. WHAT-IF: A hypothetical. SOLUTIONS: Two practical actions. What would you do?",
+            "sources": [
+                {"title": "UN-Water report", "url": "https://example.org/report", "supports": "Water-stress context"}
+            ],
+            "visual_scenes": [
+                {"text": "FACT: Reservoir levels are under pressure.", "keywords": ["low reservoir", "water monitoring"]},
+                {"text": "SOLUTIONS: Improve irrigation.", "keywords": ["efficient irrigation farm"]},
+            ],
+            "visual_clip_audit": [
+                {"scene": 1, "matched_clip_count": 2, "source_ids": ["px1", "px2"], "searches": ["low reservoir"]}
+            ],
+        }
+        with tempfile.TemporaryDirectory() as folder:
+            with patch.object(autopilot, "WORK", Path(folder)):
+                path = autopilot.write_episode_review_manifest(
+                    meta, "short", 58.25, Path("final_short.mp4")
+                )
+                saved = json.loads(path.read_text(encoding="utf-8"))
+
+        self.assertEqual(path.name, "episode_review.json")
+        self.assertEqual(saved["narration"], meta["narration"])
+        self.assertEqual(saved["sources"], meta["sources"])
+        self.assertEqual(saved["visual_scenes"][0]["narration"], meta["visual_scenes"][0]["text"])
+        self.assertEqual(saved["visual_clip_audit"], meta["visual_clip_audit"])
+        self.assertEqual(saved["captions_file"], "captions.srt")
+        self.assertEqual(saved["video_file"], "final_short.mp4")
+        self.assertEqual(saved["duration_seconds"], 58.25)
 
 if __name__ == "__main__":
     unittest.main()
