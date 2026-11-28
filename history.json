@@ -2125,6 +2125,19 @@
       "platforms": {},
       "failed_stage": "scene planning",
       "error": "Scene planning could not complete safely: Gemini API request failed after bounded retries; inspect redacted workflow diagnostics."
+    },
+    {
+      "time": "2026-11-28T07:34:57Z",
+      "github_run_id": "46121795754",
+      "github_run_attempt": "1",
+      "github_event": "schedule",
+      "format": "short",
+      "topic": "Ocean warming, sea-level rise and glacier loss",
+      "status": "generation_failed",
+      "generated": false,
+      "platforms": {},
+      "failed_stage": "scene planning",
+      "error": "Scene planning could not complete safely: Gemini API request failed after bounded retries; inspect redacted workflow diagnostics."
     }
   ]
 }
