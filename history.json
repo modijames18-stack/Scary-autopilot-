@@ -2096,6 +2096,22 @@
       "platforms": {},
       "failed_stage": "scene planning",
       "error": "Scene planning could not complete safely: Gemini API timed out after bounded retries. Check provider availability or configure ANTHROPIC_API_KEY with AI_PROVIDER=anthropic."
+    },
+    {
+      "time": "2026-11-28T01:36:07Z",
+      "github_run_id": "46093871842",
+      "github_run_attempt": "1",
+      "github_event": "schedule",
+      "format": "short",
+      "topic": "Climate change, extreme weather and food security",
+      "status": "generation_failed",
+      "generated": false,
+      "platforms": {},
+      "title": "Fragile Harvests: How Climate Extremes Threaten Global Food",
+      "source_count": 3,
+      "visual_scene_count": 6,
+      "failed_stage": "scene footage and rendering",
+      "error": "No unused stock footage passed the relevance check for narration scene 2: ['drought cracked earth climate', 'floodplain flood damage farm', 'heatwave weather crop damage']. Refusing repeated or unrelated filler footage."
     }
   ]
 }
